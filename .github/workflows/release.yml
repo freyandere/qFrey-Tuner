@@ -1,0 +1,43 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        enable-cache: true
+        
+    - name: Install dependencies
+      run: uv pip install --system . pyinstaller
+      
+    - name: Build with PyInstaller
+      run: |
+        $VERSION = git describe --tags --abbrev=0
+        uv run pyinstaller --onefile --windowed --name="qFrey-Tuner_$VERSION" main.py
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/qFrey-Tuner_*.exe
+        body_path: CHANGELOG.md
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

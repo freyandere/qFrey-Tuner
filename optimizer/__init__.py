@@ -1,0 +1,1 @@
+# qBittorrent Optimizer - Core module
