@@ -17,35 +17,41 @@ from optimizer.models import EnvironmentProfile
 
 # Данные профилей: иконка, название, описание
 PROFILES_DATA = {
-    EnvironmentProfile.DESKTOP: {
+    EnvironmentProfile.SYSTEM: {
         "icon": "🖥️",
-        "title": "Desktop",
-        "subtitle": "Win / Mac / Linux",
-        "description": "Стандартные настройки для персонального компьютера",
+        "title": "System Desktop",
+        "subtitle": "Windows / macOS / Linux",
+        "description": "Стандартная установка. Конфиг ищется в системных папках (%APPDATA% или .config).",
+    },
+    EnvironmentProfile.PORTABLE: {
+        "icon": "🚀",
+        "title": "Portable",
+        "subtitle": "Windows (EXE folder)",
+        "description": "Портабельная версия. Конфиг ищется в папке с программой или подпапке profile/.",
     },
     EnvironmentProfile.TRUENAS: {
         "icon": "🗄️",
         "title": "TrueNAS / ZFS",
         "subtitle": "FreeNAS, TrueNAS",
-        "description": "Disk Cache отключён — ZFS ARC управляет кэшированием",
+        "description": "Disk Cache отключён — ZFS ARC управляет кэшированием.",
     },
     EnvironmentProfile.NAS: {
         "icon": "📦",
         "title": "NAS",
         "subtitle": "Synology / QNAP",
-        "description": "Настройки для сетевых хранилищ без ZFS",
+        "description": "Настройки для сетевых хранилищ без ZFS.",
     },
     EnvironmentProfile.DOCKER: {
         "icon": "🐳",
         "title": "Docker",
         "subtitle": "Контейнер с VPN",
-        "description": "Привязка к tun0/wg0 внутри контейнера",
+        "description": "Привязка к tun0/wg0 внутри контейнера.",
     },
     EnvironmentProfile.SEEDBOX: {
         "icon": "⚡",
         "title": "Seedbox",
         "subtitle": "1-10 Gbps",
-        "description": "Экстремальные настройки для гигабитных каналов",
+        "description": "Экстремальные настройки для гигабитных каналов.",
     },
 }
 
@@ -132,7 +138,7 @@ class WelcomeDialog(QDialog):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.selected_profile = EnvironmentProfile.DESKTOP
+        self.selected_profile = EnvironmentProfile.SYSTEM
         self._profile_cards: dict[EnvironmentProfile, ProfileCard] = {}
         self._setup_ui()
     
@@ -182,10 +188,10 @@ class WelcomeDialog(QDialog):
         layout.addLayout(cards_layout)
         
         # Устанавливаем Desktop по умолчанию
-        self._profile_cards[EnvironmentProfile.DESKTOP].set_selected(True)
+        self._profile_cards[EnvironmentProfile.SYSTEM].set_selected(True)
         
         # Описание выбранного профиля
-        self.description_label = QLabel(PROFILES_DATA[EnvironmentProfile.DESKTOP]["description"])
+        self.description_label = QLabel(PROFILES_DATA[EnvironmentProfile.SYSTEM]["description"])
         self.description_label.setFont(QFont("Segoe UI", 10))
         self.description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.description_label.setStyleSheet("color: #888; padding: 10px;")

@@ -19,7 +19,15 @@ class UsageTab(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._environment = EnvironmentProfile.DESKTOP
+        # The instruction implies a change to how the environment is set or selected.
+        # The provided snippet adds items to a non-existent self.env_combo.
+        # Assuming the intent is to change the initial default environment to SYSTEM,
+        # and that the env_combo part is either a future addition or a misunderstanding
+        # in the provided snippet's context.
+        # If the user intended to add a QComboBox, more context would be needed for its creation.
+        # For now, I will interpret "Update UsageTab to use EnvironmentProfile.SYSTEM"
+        # as changing the initial default value.
+        self._environment = EnvironmentProfile.SYSTEM
         self._setup_ui()
     
     def _setup_ui(self):

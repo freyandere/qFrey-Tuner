@@ -14,7 +14,10 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QCheckBox,
     QFileDialog,
+    QToolButton,
 )
+import os
+import subprocess
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
@@ -41,7 +44,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("qBittorrent Optimizer")
         self.setMinimumSize(1000, 750)
         self._show_advanced = False
-        self._environment = EnvironmentProfile.DESKTOP
+        self._environment = EnvironmentProfile.SYSTEM
         self._last_result: OptimizedSettings | None = None
         self.config_manager = ConfigManager()
         self.session_manager = SessionManager()
@@ -68,19 +71,31 @@ class MainWindow(QMainWindow):
         subtitle.setStyleSheet("color: #aaa; margin-bottom: 10px;")
         main_layout.addWidget(subtitle)
         
-        # Environment badge
-        self.env_badge = QLabel()
-        self.env_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.env_badge.setStyleSheet("""
-            QLabel {
+        # Environment selection (Top Badge)
+        self.env_btn = QPushButton()
+        self.env_btn.setToolTip("Нажмите, чтобы сменить среду")
+        self.env_btn.clicked.connect(self._show_welcome)
+        self.env_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.env_btn.setStyleSheet("""
+            QPushButton {
                 background: #1a3a5c;
                 color: #6ea8fe;
                 padding: 6px 16px;
                 border-radius: 12px;
                 font-weight: bold;
+                border: 1px solid #2a4a6c;
+            }
+            QPushButton:hover {
+                background: #2a4a6c;
+                border: 1px solid #6ea8fe;
             }
         """)
-        main_layout.addWidget(self.env_badge)
+        
+        env_container = QHBoxLayout()
+        env_container.addStretch()
+        env_container.addWidget(self.env_btn)
+        env_container.addStretch()
+        main_layout.addLayout(env_container)
         
         # Legend
         legend = QLabel("* — обязательные поля")
@@ -112,26 +127,7 @@ class MainWindow(QMainWindow):
         # Buttons
         buttons_layout = QHBoxLayout()
         
-        # Change environment button
-        self.change_env_btn = QPushButton("Изменить среду")
-        self.change_env_btn.clicked.connect(self._show_welcome)
-        self.change_env_btn.setStyleSheet("""
-            QPushButton {
-                background: #2a2a2a;
-                color: #aaa;
-                border: 1px solid #444;
-                border-radius: 6px;
-                padding: 8px 16px;
-            }
-            QPushButton:hover {
-                background: #333;
-                color: #fff;
-            }
-        """)
-        buttons_layout.addWidget(self.change_env_btn)
-        
-        buttons_layout.addStretch()
-        tabs_layout.addLayout(buttons_layout)
+        tabs_layout.addStretch()
         
         # Calculate button
         self.calc_button = QPushButton("Рассчитать настройки")
@@ -217,12 +213,7 @@ class MainWindow(QMainWindow):
         
         # Config path label
         self.config_status_label = QLabel()
-        if self.config_manager.config_path:
-            self.config_status_label.setText(f"📁 Обнаружен конфиг: {self.config_manager.config_path.name}")
-            self.config_status_label.setStyleSheet("color: #28a745; font-size: 11px;")
-        else:
-            self.config_status_label.setText("❌ Конфиг qBittorrent не найден")
-            self.config_status_label.setStyleSheet("color: #dc3545; font-size: 11px;")
+        self._update_config_status()
         results_layout.addWidget(self.config_status_label)
         
         # Manual path button
@@ -269,7 +260,40 @@ class MainWindow(QMainWindow):
     def _update_env_badge(self):
         """Обновить badge среды."""
         data = PROFILES_DATA[self._environment]
-        self.env_badge.setText(f"{data['icon']} {data['title']}")
+        self.env_btn.setText(f"{data['icon']} {data['title']}")
+    
+    def _on_config_label_clicked(self, event):
+        """Открыть папку с конфигом."""
+        if self.config_manager.config_path:
+            folder = self.config_manager.config_path.parent
+            if os.path.exists(folder):
+                os.startfile(folder)
+
+    def _update_config_status(self):
+        """Обновить статус конфига."""
+        if hasattr(self, 'config_status_label'):
+            if self.config_manager.config_path:
+                type_str = f" ({self.config_manager.installation_type})"
+                self.config_status_label.setText(f"📁 Обнаружен конфиг{type_str}: {self.config_manager.config_path.name}")
+                self.config_status_label.setToolTip(f"Нажмите, чтобы открыть папку:\n{path_str}")
+                self.config_status_label.setStyleSheet("""
+                    QLabel { 
+                        color: #28a745; 
+                        font-size: 11px; 
+                        text-decoration: underline;
+                    }
+                    QLabel:hover {
+                        color: #34ce57;
+                    }
+                """)
+                self.config_status_label.setCursor(Qt.CursorShape.PointingHandCursor)
+                self.config_status_label.mouseReleaseEvent = self._on_config_label_clicked
+            else:
+                self.config_status_label.setText("❌ Конфиг qBittorrent не найден")
+                self.config_status_label.setStyleSheet("color: #dc3545; font-size: 11px;")
+                self.config_status_label.setToolTip("")
+                self.config_status_label.setCursor(Qt.CursorShape.ArrowCursor)
+                self.config_status_label.mouseReleaseEvent = None
     
     def _on_advanced_toggled(self, state):
         self._show_advanced = state == Qt.CheckState.Checked.value
@@ -431,8 +455,7 @@ class MainWindow(QMainWindow):
         
         if file_path:
             if self.config_manager.set_manual_path(file_path):
-                self.config_status_label.setText(f"✅ Выбран вручную: {Path(file_path).name}")
-                self.config_status_label.setStyleSheet("color: #28a745; font-size: 11px;")
+                self._update_config_status()
                 if self._last_result:
                     self.apply_button.setEnabled(True)
                 QMessageBox.information(self, "Успех", "Конфигурационный файл успешно распознан.")

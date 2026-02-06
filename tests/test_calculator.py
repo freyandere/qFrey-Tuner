@@ -21,7 +21,7 @@ def test_calculate_desktop_defaults():
     usage = UsageSettings(
         tracker_type=TrackerType.PUBLIC,
         user_role=UserRole.LEECHER,
-        environment=EnvironmentProfile.DESKTOP
+        environment=EnvironmentProfile.SYSTEM
     )
     
     settings = calculate_optimal_settings(network, hardware, usage)

@@ -13,7 +13,8 @@ class ConnectionType(Enum):
 
 class EnvironmentProfile(Enum):
     """Среда установки qBittorrent."""
-    DESKTOP = "Desktop (Windows/macOS/Linux)"
+    SYSTEM = "System (Windows/macOS/Linux)"
+    PORTABLE = "Portable (Windows)"
     TRUENAS = "TrueNAS / ZFS"
     NAS = "NAS (Synology/QNAP)"
     DOCKER = "Docker (с VPN)"
@@ -80,7 +81,7 @@ class UsageSettings:
     """Сценарий использования."""
     tracker_type: TrackerType
     user_role: UserRole = UserRole.LEECHER
-    environment: EnvironmentProfile = EnvironmentProfile.DESKTOP
+    environment: EnvironmentProfile = EnvironmentProfile.SYSTEM
 
 
 @dataclass

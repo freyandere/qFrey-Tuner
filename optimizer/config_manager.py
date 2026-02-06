@@ -15,17 +15,22 @@ class ConfigManager:
     """Управление файлом настроек qBittorrent."""
 
     def __init__(self):
+        self.installation_type = "Unknown"
         self.config_path: Optional[Path] = self._find_config()
         self.config = configparser.ConfigParser(interpolation=None)
-        # qBittorrent использует регистрозависимые ключи в некоторых секциях
         self.config.optionxform = str
 
-    def _find_config(self) -> Optional[Path]:
+    def _find_config(self, env_profile=None) -> Optional[Path]:
         """Поиск файла qBittorrent.ini / qBittorrent.conf."""
-        # 1. Проверяем портабельный режим (папка profile рядом с .exe)
-        # В контексте разработки проверяем корень проекта или стандартные места
+        # 1. Проверяем портабельный режим
+        cwd_ini = Path("qBittorrent.ini")
+        if cwd_ini.exists():
+            self.installation_type = "Portable"
+            return cwd_ini
+            
         portable_path = Path("profile/qBittorrent/config/qBittorrent.ini")
         if portable_path.exists():
+            self.installation_type = "Portable"
             return portable_path
 
         # 2. Windows стандарт
@@ -34,11 +39,13 @@ class ConfigManager:
             if appdata:
                 win_path = Path(appdata) / "qBittorrent" / "qBittorrent.ini"
                 if win_path.exists():
+                    self.installation_type = "System"
                     return win_path
 
         # 3. Linux / macOS стандарт
         home_config = Path.home() / ".config" / "qBittorrent" / "qBittorrent.conf"
         if home_config.exists():
+            self.installation_type = "System"
             return home_config
 
         return None
