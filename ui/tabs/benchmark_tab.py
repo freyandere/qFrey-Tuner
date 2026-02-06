@@ -71,13 +71,14 @@ class BenchmarkTab(QWidget):
         self._recording_timer.timeout.connect(self._on_record_tick)
         
         # Ubuntu 25.10 "Questing Quokka"
-        self._test_hash = "c8295ce630f2064f08440db1534e4992cfe4862a"
+        self._test_hash = "6a40552b7dfe176a928ba556128445103ca7fe45" 
+        self._is_standardized = False
+        self._is_external_torrent = False
         self._test_magnet = (
             "magnet:?xt=urn:btih:c8295ce630f2064f08440db1534e4992cfe4862a"
             "&dn=ubuntu-25.10-desktop-amd64.iso"
             "&tr=https%3A%2F%2Ftorrent.ubuntu.com%2Fannounce"
         )
-        self._is_standardized = False
         
         self._setup_ui()
         
@@ -323,18 +324,21 @@ class BenchmarkTab(QWidget):
         stats = self.manager.get_torrent_stats(self._test_hash)
         if stats:
             self._is_standardized = True
+            self._is_external_torrent = True
             self.baseline_btn.setEnabled(True)
             self.optimized_btn.setEnabled(True)
             self.cleanup_btn.setEnabled(True)
             QMessageBox.information(
                 self, "Уже добавлен", 
-                "Тестовый Ubuntu ISO уже найден в списке торрентов. Используем его."
+                "Тестовый Ubuntu ISO уже найден в списке торрентов. Будем использовать его, "
+                "но при очистке файлы не удалим."
             )
             return
 
         save_path = self.save_path_edit.text().strip()
         if self.manager.add_torrent(self._test_magnet, save_path=save_path):
             self._is_standardized = True
+            self._is_external_torrent = False
             QMessageBox.information(
                 self, "Добавлено", 
                 "Ubuntu 25.10 ISO успешно добавлен! Подождите 10-20 секунд, пока он подхватит сиды, "
@@ -347,9 +351,25 @@ class BenchmarkTab(QWidget):
         """Удалить тестовый ISO."""
         if not self._check_connection():
             return
-            
+        
+        if self._is_external_torrent:
+             # Если торрент был внешним, мы его просто "забываем" в контексте бенчмарка,
+             # но не удаляем из клиента (или удаляем только задачу, без файлов).
+             # Безопаснее всего - спросить или просто не удалять файлы.
+             # Решение: Просто сбросить флаги в UI, сказав пользователю, что мы закончили.
+             self._is_standardized = False
+             self._is_external_torrent = False
+             self.baseline_btn.setEnabled(False)
+             self.optimized_btn.setEnabled(False)
+             self.cleanup_btn.setEnabled(False)
+             QMessageBox.information(self, "Готово", "Тест завершён. Ваш существующий торрент не был затронут.")
+             return
+
         if self.manager.delete_torrent(self._test_hash):
             self._is_standardized = False
+            self.baseline_btn.setEnabled(False)
+            self.optimized_btn.setEnabled(False)
+            self.cleanup_btn.setEnabled(False)
             QMessageBox.information(self, "Готово", "Тестовые данные удалены из qBittorrent.")
         else:
             QMessageBox.warning(self, "Ошибка", "Не удалось удалить торрент.")

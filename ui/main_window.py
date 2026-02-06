@@ -273,6 +273,7 @@ class MainWindow(QMainWindow):
         """Обновить статус конфига."""
         if hasattr(self, 'config_status_label'):
             if self.config_manager.config_path:
+                path_str = str(self.config_manager.config_path)
                 type_str = f" ({self.config_manager.installation_type})"
                 self.config_status_label.setText(f"📁 Обнаружен конфиг{type_str}: {self.config_manager.config_path.name}")
                 self.config_status_label.setToolTip(f"Нажмите, чтобы открыть папку:\n{path_str}")
