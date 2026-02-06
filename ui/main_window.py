@@ -21,6 +21,7 @@ from PyQt6.QtGui import QFont
 from .tabs.network_tab import NetworkTab
 from .tabs.hardware_tab import HardwareTab
 from .tabs.usage_tab import UsageTab
+from .tabs.benchmark_tab import BenchmarkTab
 from .welcome_dialog import WelcomeDialog, PROFILES_DATA
 from optimizer.calculator import calculate_optimal_settings
 from optimizer.models import (
@@ -99,10 +100,12 @@ class MainWindow(QMainWindow):
         self.network_tab = NetworkTab()
         self.hardware_tab = HardwareTab()
         self.usage_tab = UsageTab()
+        self.benchmark_tab = BenchmarkTab()
         
-        self.tabs.addTab(self.network_tab, "Сеть")
-        self.tabs.addTab(self.hardware_tab, "Железо")
-        self.tabs.addTab(self.usage_tab, "Сценарий")
+        self.tabs.addTab(self.network_tab, "📡 Сеть")
+        self.tabs.addTab(self.hardware_tab, "💻 Железо")
+        self.tabs.addTab(self.usage_tab, "⚙️ Сценарий")
+        self.tabs.addTab(self.benchmark_tab, "🚀 Бенчмарк")
         
         tabs_layout.addWidget(self.tabs)
         

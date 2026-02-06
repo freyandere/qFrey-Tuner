@@ -8,7 +8,7 @@ from optimizer.models import (
     OptimizedSettings, ProtocolMode, EncryptionMode
 )
 
-def test_apply_settings():
+def test_config_manager_apply_settings():
     # Создаем временный конфиг
     test_conf = Path("test_qbittorrent.ini")
     if test_conf.exists():
@@ -67,11 +67,6 @@ def test_apply_settings():
     assert config["Connection"]["Interface"] == "tun0"
     assert config["Advanced"]["DiskCache"] == "512"
     
-    print("✅ Test passed!")
-    
     # Очистка
     if test_conf.exists():
         test_conf.unlink()
-
-if __name__ == "__main__":
-    test_apply_settings()

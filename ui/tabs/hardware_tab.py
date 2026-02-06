@@ -15,6 +15,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 
 from optimizer.models import StorageType, HardwareSettings
+from optimizer.hardware_detector import HardwareDetector
+from PyQt6.QtWidgets import QPushButton
 
 
 # Фиксированные значения на основе реальной статистики
@@ -55,11 +57,31 @@ class HardwareTab(QWidget):
         self._storage_touched = False
         self._ram_touched = False
         self._cores_touched = False
+        self.detector = HardwareDetector()
         self._setup_ui()
     
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
+        
+        # === Auto-detect Button ===
+        self.autodetect_btn = QPushButton("✨ Авто-определение системы")
+        self.autodetect_btn.setMinimumHeight(35)
+        self.autodetect_btn.setStyleSheet("""
+            QPushButton {
+                background: #1a3a5c;
+                color: #6ea8fe;
+                border: 1px solid #0d6efd;
+                border-radius: 6px;
+                font-weight: bold;
+                margin-bottom: 5px;
+            }
+            QPushButton:hover {
+                background: #234c7a;
+            }
+        """)
+        self.autodetect_btn.clicked.connect(self._on_autodetect)
+        layout.addWidget(self.autodetect_btn)
         
         # === Накопитель ===
         storage_group = QGroupBox("Накопитель для загрузок *")
@@ -264,3 +286,29 @@ class HardwareTab(QWidget):
             is_hybrid_cpu=self.hybrid_check.isChecked(),
             p_cores=self.p_cores_spin.value() if self.hybrid_check.isChecked() else 0,
         )
+
+    def _on_autodetect(self):
+        """Авто-определение характеристик."""
+        # RAM
+        ram_gb = self.detector.get_total_ram_gb()
+        self.ram_spin.setValue(int(ram_gb))
+        
+        # CPU
+        cpu = self.detector.get_cpu_info()
+        self.cores_spin.setValue(cpu["physical_cores"])
+        self.hybrid_check.setChecked(cpu["is_hybrid"])
+        if cpu["is_hybrid"]:
+            self.p_cores_spin.setValue(cpu["p_cores"])
+            
+        # Disk
+        disk_type_str = self.detector.get_main_disk_type()
+        # Сопоставляем строку с Enum StorageType
+        for i in range(self.storage_combo.count()):
+            st = self.storage_combo.itemData(i)
+            if st and disk_type_str.upper() in st.name:
+                self.storage_combo.setCurrentIndex(i)
+                break
+        
+        self._storage_touched = True
+        self._ram_touched = True
+        self._cores_touched = True

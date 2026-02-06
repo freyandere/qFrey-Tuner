@@ -16,6 +16,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 
 from optimizer.models import ConnectionType, NetworkSettings
+from optimizer.network_tester import NetworkTester
+from PyQt6.QtWidgets import QPushButton
+from PyQt6.QtCore import QThread, pyqtSignal
 
 
 # Ступенчатая прогрессия скоростей (Best Practice 2026)
@@ -50,6 +53,7 @@ class NetworkTab(QWidget):
         super().__init__(parent)
         self._download_touched = False
         self._upload_touched = False
+        self.tester = NetworkTester()
         self._setup_ui()
     
     def _setup_ui(self):
@@ -61,6 +65,30 @@ class NetworkTab(QWidget):
         speed_group.setStyleSheet("QGroupBox { font-weight: bold; }")
         speed_group.setMinimumWidth(350)
         speed_layout = QVBoxLayout(speed_group)
+        
+        # === Test Button ===
+        self.test_btn = QPushButton("🚀 Тестировать скорость (Спидтест)")
+        self.test_btn.setMinimumHeight(35)
+        self.test_btn.setStyleSheet("""
+            QPushButton {
+                background: #1a3c1a;
+                color: #28a745;
+                border: 1px solid #198754;
+                border-radius: 6px;
+                font-weight: bold;
+                margin-bottom: 10px;
+            }
+            QPushButton:hover {
+                background: #234c23;
+            }
+            QPushButton:disabled {
+                background: #222;
+                color: #555;
+                border-color: #333;
+            }
+        """)
+        self.test_btn.clicked.connect(self._on_test_connection)
+        speed_layout.addWidget(self.test_btn)
         
         # Download
         download_layout = QVBoxLayout()
@@ -263,3 +291,30 @@ class NetworkTab(QWidget):
             vpn_interface=self.vpn_interface_edit.text().strip(),
             isp_throttling=self.isp_throttle_check.isChecked(),
         )
+
+    def _on_test_connection(self):
+        """Запустить тест скорости в фоновом потоке."""
+        self.test_btn.setEnabled(False)
+        self.test_btn.setText("⏳ Тестирование... (до 20 сек)")
+        
+        class TestThread(QThread):
+            finished = pyqtSignal(float, float, str)
+            def run(self):
+                dl, ul, server = NetworkTester.run_full_test()
+                self.finished.emit(dl, ul, server)
+        
+        self.thread = TestThread(self)
+        self.thread.finished.connect(self._on_test_finished)
+        self.thread.start()
+
+    def _on_test_finished(self, dl, ul, server):
+        """Обработка результатов теста."""
+        self.test_btn.setEnabled(True)
+        self.test_btn.setText(f"🚀 Тест: {server}")
+        
+        if dl > 0:
+            self.download_spin.setValue(int(dl))
+            self._download_touched = True
+        if ul > 0:
+            self.upload_spin.setValue(int(ul))
+            self._upload_touched = True

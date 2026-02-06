@@ -144,6 +144,22 @@ pyinstaller --onefile --windowed --name="qBittorrent Optimizer" main.py
 - [libtorrent documentation](https://libtorrent.org/reference-Settings.html)
 - qBittorrent Wiki & Forums
 
+## 🚀 How to Create a New Release
+
+This project uses GitHub Actions to automate builds. To create a new version:
+
+1. Update the version in `pyproject.toml`.
+2. Commit your changes.
+3. Create and push a git tag:
+   ```bash
+   git tag v0.2.0
+   git push origin v0.2.0
+   ```
+4. GitHub will automatically:
+   - Build the Windows `.exe`.
+   - Create a new Release.
+   - Generate a changelog based on your commit history.
+
 ## 📝 License
 
 MIT License
