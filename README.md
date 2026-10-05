@@ -1,6 +1,6 @@
 # qFrey-Tuner
 
-The launcher uses `artifacts/release/qFrey-Tuner.exe`. Local builds and CI use `scripts/build.py`; intermediate files stay in `.cache/`. Previous executables are preserved in `artifacts/archive/`. See the [build layout design](docs/build-layout-design.md) for paths, retention and cleanup rules. Internet tests and torrent measurements cannot overlap.
+The launcher uses `artifacts/release/qFrey-Tuner.exe`. Local builds use `scripts/build.py`; intermediate files stay in `.cache/`. Previous executables are preserved in `artifacts/archive/`. See the [build layout design](docs/build-layout-design.md) for paths, retention and cleanup rules. Internet tests and torrent measurements cannot overlap.
 
 qFrey-Tuner calculates rule-based qBittorrent recommendations and runs a verified before/after optimization cycle using CustomTkinter.
 
@@ -86,7 +86,7 @@ The app can start a manually selected local executable. Graceful shutdown/restar
 - Process discovery can be restricted by OS permissions. Lifecycle actions fail clearly when ownership cannot be established.
 - Offline schema writes are deliberately blocked; there is no legacy guessed-key writer.
 
-Official sources, the version gate, reproducible test commands and the procedure for extending support are recorded in [version compatibility](docs/version-compatibility.md). The [schema audit](docs/qbittorrent-schema-audit-ru.md) maps every applied API field to its configuration key. CI runs regression tests and `scripts/check_qbittorrent_schema.py` against the reviewed upstream tags before release builds.
+Official sources, the version gate, reproducible test commands and the procedure for extending support are recorded in [version compatibility](docs/version-compatibility.md). The [schema audit](docs/qbittorrent-schema-audit-ru.md) maps every applied API field to its configuration key. Before publishing a release, run regression tests and `scripts/check_qbittorrent_schema.py` locally against the reviewed upstream tags. GitHub Actions are not used.
 
 ## Development and verification
 
@@ -99,4 +99,4 @@ python scripts/build.py
 
 GUI smoke tests require a graphical session and working Tcl/Tk. Tests exercise API transport using a local HTTP fixture, cycle ordering, compatibility, stale-input guards, durable backups, readback failures, workload mismatch, rollback, process ownership, and setup gating. They do not change a real qBittorrent installation.
 
-The release workflow builds a Windows executable on `v*` tags. Follow [the canonical repository](https://github.com/freyandere/qFrey-Tuner) for released versions.
+Releases contain locally tested Windows builds uploaded manually with a matching `v<version>` tag. Follow [the canonical repository](https://github.com/freyandere/qFrey-Tuner) for released versions.

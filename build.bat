@@ -15,11 +15,13 @@ if errorlevel 1 (
 )
 uv sync --locked --extra dev
 if errorlevel 1 goto failed
-uv run --extra dev python main.py --check
+uv run --locked --extra dev python main.py --check
 if errorlevel 1 goto failed
-uv run --extra dev python -m pytest tests/ -q -p no:cacheprovider
+uv run --locked --extra dev python -m pytest tests/ -q -p no:cacheprovider
 if errorlevel 1 goto failed
-uv run --extra dev python tests/verify_startup.py
+uv run --locked --extra dev python scripts/check_qbittorrent_schema.py
+if errorlevel 1 goto failed
+uv run --locked --extra dev python tests/verify_startup.py
 if errorlevel 1 goto failed
 uv run --locked --extra dev python scripts/build.py
 if errorlevel 1 goto failed

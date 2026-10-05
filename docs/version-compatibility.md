@@ -43,8 +43,8 @@ verified readback; Tuner does not write the selected INI/CONF directly.
 With the existing development dependencies installed:
 
 ```powershell
-uv run --extra dev python -m pytest tests/ -q
-uv run --extra dev python scripts/check_qbittorrent_schema.py
+uv run --locked --extra dev python -m pytest tests/ -q
+uv run --locked --extra dev python scripts/check_qbittorrent_schema.py
 ```
 
 The pytest suite is independent of external documentation/network services;
@@ -68,8 +68,7 @@ It does not execute C++, prove enum/units semantics, or run qBittorrent. Those
 need the documented source review and targeted regression tests. Network errors
 fail this check visibly; they are not reported as a schema match.
 
-`.github/workflows/tests.yml` runs both checks on branch pushes and pull requests.
-The release workflow also checks the upstream contract before building.
+Run both checks locally before publishing a release. GitHub Actions are not used.
 No test modifies a user's real client.
 
 ## Adding a parameter or supported branch
