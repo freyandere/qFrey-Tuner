@@ -173,6 +173,38 @@ def test_external_changes_block_rollback(cycle):
     assert cycle.original
 
 
+def test_failed_restore_keeps_backup_but_clears_verified_status(cycle, monkeypatch):
+    baseline(cycle)
+    cycle.preview(settings(), {})
+    cycle.apply({})
+    def partial_restore(values):
+        key = next(iter(values))
+        cycle.client.prefs[key] = values[key]
+        raise ClientError('lost response')
+    monkeypatch.setattr(cycle.client, 'set_preferences', partial_restore)
+    with pytest.raises(ClientError, match='lost response'):
+        cycle.rollback()
+    assert cycle.original
+    assert not cycle.verified
+    saved = json.loads(cycle.path.read_text())
+    assert saved['original'] == cycle.original
+    assert saved['verified'] is False
+
+
+def test_backup_write_failure_never_applies_settings(cycle, monkeypatch):
+    baseline(cycle)
+    cycle.preview(settings(), {})
+    original = dict(cycle.client.prefs)
+    def disk_full():
+        raise OSError('disk full')
+    monkeypatch.setattr(cycle, 'persist', disk_full)
+    with pytest.raises(OSError, match='disk full'):
+        cycle.apply({})
+    assert cycle.client.prefs == original
+    assert cycle.original is None and cycle.applied is None
+    assert not cycle.verified
+
+
 def test_real_http_api_login_schema_apply_readback(tmp_path):
     state = FakeClient()
     class Handler(BaseHTTPRequestHandler):

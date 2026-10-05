@@ -7,10 +7,14 @@ def trace_point(torrents, elapsed, phase, hashes=None):
     def count(key):
         return sum(t[key] for t in selected) if selected and all(isinstance(t.get(key), (int, float)) for t in selected) else None
     seeds, leechs = count('num_seeds'), count('num_leechs')
+    states_known = bool(selected) and all(isinstance(t.get('state'), str) for t in selected)
     return {'elapsed': float(elapsed), 'download': sum(t.get('dlspeed', 0) for t in selected),
             'upload': sum(t.get('upspeed', 0) for t in selected), 'seeds': seeds,
             'peers': seeds + leechs if seeds is not None and leechs is not None else None,
-            'phase': phase}
+            'phase': phase,
+            'stalled_downloads': sum(t.get('state') == 'stalledDL' for t in selected) if states_known else None,
+            'stalled_uploads': sum(t.get('state') == 'stalledUP' for t in selected) if states_known else None,
+            'errors': sum(t.get('state') in ('error', 'missingFiles') for t in selected) if states_known else None}
 
 
 def ramp_metrics(trace):

@@ -8,7 +8,7 @@ class UsageTab(ctk.CTkScrollableFrame):
 
     def __init__(self, master):
         super().__init__(master, fg_color="transparent")
-        from ui.tabs.benchmark_tab import card
+        from ui.tabs import card
         card(self, 'How you use torrents', 'Choose your priorities and tracker type. These guide sharing limits, download queues and peer discovery.')
         self._environment = EnvironmentProfile.SYSTEM
         self._setup_ui()

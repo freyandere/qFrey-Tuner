@@ -1,8 +1,8 @@
 # qFrey-Tuner
 
-Latest local fix: `outputs/qFrey-Tuner_v0.3.3.exe` (preferred by Run.bat). API keys support Ctrl+V and an explicit masked paste button. Test torrent adds are verified through hash/tag readback rather than requiring a response body. Retrying a saved owned test returns its current state without adding again; independent existing torrents are not claimed. Delayed appearance is polled for five seconds, and saved identity is retained across ambiguous failures. A completed/seeding test cannot provide another download baseline; use a sustained active workload rather than assuming presence means download traffic.
+The launcher uses `outputs/qFrey-Tuner.exe`, updated by `build.bat` from the exact version in `pyproject.toml`. Versioned copies are kept in `dist/` for sharing. Internet tests and torrent measurements run through one background-job queue and cannot overlap.
 
-qFrey-Tuner calculates rule-based qBittorrent recommendations and runs a verified before/after optimization cycle. The local 0.3.2 application uses CustomTkinter.
+qFrey-Tuner calculates rule-based qBittorrent recommendations and runs a verified before/after optimization cycle using CustomTkinter.
 
 **Canonical repository and sync remote:** [freyandere/qFrey-Tuner](https://github.com/freyandere/qFrey-Tuner)
 
@@ -22,7 +22,6 @@ Run from a writable folder. Experiment files are stored in `state/` beside the s
 
 A locally built application can be placed at `outputs/qFrey-Tuner.exe`; `Run.bat` launches that standalone build before checking source runtimes. When changing source code, rebuild that executable before using the launcher, or run `python main.py` directly to test the source.
 
-The guided-flow update is delivered as `outputs/qFrey-Tuner_v0.3.2.exe` because the previous executable was running during delivery. `Run.bat` prefers this versioned build when present. Close the previous window before launching the update.
 
 ### Web UI connection and diagnostic logs
 

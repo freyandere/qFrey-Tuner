@@ -14,6 +14,7 @@ from optimizer.calculator import calculate_optimal_settings
 from optimizer.config_manager import ConfigManager
 from optimizer.optimization_cycle import OptimizationCycle, json_value, save_json
 from optimizer.process_manager import ProcessManager
+from optimizer.network_tester import NetworkTester
 from optimizer.models import EnvironmentProfile
 from optimizer.qbittorrent_client import QBittorrentClient, ClientError
 from optimizer.diagnostics import configure_logging, logger
@@ -62,7 +63,7 @@ class MainWindow(ctk.CTk):
         self.tab_view = WorkflowTabview(self, command=self._gate_navigation)
         self.tab_view.grid(row=0, column=0, sticky="nsew", padx=16, pady=12)
         setup = self.tab_view.add("Connect")
-        self.network_tab = NetworkTab(self.tab_view.add("Network"))
+        self.network_tab = NetworkTab(self.tab_view.add("Network"), self)
         self.hardware_tab = HardwareTab(self.tab_view.add("Hardware"))
         self.usage_tab = UsageTab(self.tab_view.add("Your goals"))
         self.usage_tab.set_environment(config_manager.profile)
@@ -92,7 +93,7 @@ class MainWindow(ctk.CTk):
         if path.is_file():
             with path.open("rb") as stream:
                 return tomllib.load(stream)["project"]["version"]
-        return "0.3.3"
+        return "unknown"
 
     def _setup_connection(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
@@ -106,7 +107,7 @@ class MainWindow(ctk.CTk):
         self.profile_menu = ctk.CTkOptionMenu(frame, values=list(self.profile_names), command=self.change_profile)
         self.profile_menu.set(next(name for name, profile in self.profile_names.items() if profile == self.config_manager.profile))
         self.profile_menu.pack(anchor="w", padx=12, pady=8)
-        from ui.tabs.benchmark_tab import card
+        from ui.tabs import card
         self.profile_detail_frame = card(frame, "What this choice changes", "")
         self.profile_detail_title = ctk.CTkLabel(self.profile_detail_frame, text="", font=("Segoe UI", 15, "bold"), anchor="w")
         self.profile_detail_title.pack(fill="x", padx=16, pady=4)
@@ -228,7 +229,7 @@ class MainWindow(ctk.CTk):
         self._guide_status()
 
     def guide_next(self):
-        if self.busy or self.network_tab._testing or not self._target_ready():
+        if self.busy or not self._target_ready():
             return
         steps = ["Connect", "Network", "Hardware", "Your goals", "Speed test", "Review changes", "Results"]
         step = self.tab_view.get()
@@ -254,9 +255,6 @@ class MainWindow(ctk.CTk):
     def _job(self, operation, success, measuring=False):
         if self.busy:
             return
-        if self.network_tab._testing:
-            messagebox.showinfo("Speed test in progress", "Wait for the network test to finish before starting another operation.", parent=self)
-            return
         self.busy = True
         logger.info("Operation started action=%s measuring=%s", getattr(operation, "__name__", "operation"), measuring)
         self._measuring = measuring
@@ -271,6 +269,17 @@ class MainWindow(ctk.CTk):
                 logger.error("Operation failed action=%s type=%s", getattr(operation, "__name__", "operation"), type(exc).__name__)
                 self.events.put(("error", str(exc)))
         threading.Thread(target=run, daemon=True).start()
+
+    def run_network_test(self):
+        if self.busy:
+            return
+        def done(result):
+            self.network_tab._on_test_finished(*result)
+            self.status_label.configure(text="Internet test finished. Review the measured download and upload speeds."
+                                        if result[0] > 0 or result[1] > 0 else
+                                        "Internet speed could not be measured. Previous speed inputs were kept; retry the test.")
+        self._job(NetworkTester.run_full_test, done)
+        self.network_tab.test_btn.configure(text="Testing internet speed…")
 
     def _drain(self):
         if self._closing:
@@ -292,11 +301,15 @@ class MainWindow(ctk.CTk):
                 else:
                     self.busy = False
                     self._measuring = False
+                    if self.network_tab.test_btn.cget('text') == "Testing internet speed…":
+                        self.network_tab.test_btn.configure(text="Retry internet speed test")
                     self.benchmark_tab.progress.pack_forget()
                     self.status_label.configure(text=event[1])
                     self.benchmark_tab.description.configure(text=event[1])
                     if self.cycle and self.cycle.original is not None:
-                        self.results_tab.set_report("Settings remain applied. The speed test did not complete; retry on Speed test or Undo in Results.")
+                        self.results_tab.set_report("Verified settings remain applied. Retry the speed test or Undo in Results."
+                                                    if self.cycle.verified else
+                                                    "Original settings are backed up, but application could not be verified. Some settings may have changed; Undo in Results restores the saved values.")
                     self._controls()
                     messagebox.showerror("Operation not completed", event[1], parent=self)
                     if not self.client.connected:
@@ -313,6 +326,7 @@ class MainWindow(ctk.CTk):
         if state == self._control_state:
             return
         self._control_state = state
+        self.network_tab.test_btn.configure(state="disabled" if self.busy else "normal")
         self.next_btn.configure(state="normal" if ready else "disabled")
         if not self._target_ready():
             self.tab_view.set("Connect")

@@ -51,7 +51,7 @@ def calculate_optimal_settings(
     # CONNECTION LIMITS
     # ═══════════════════════════════════════════════════════════════════════════
     
-    # Internet Mbps is decimal; the model's legacy *_kbps fields hold KiB/s.
+    # Internet Mbps is decimal; the model's *_kib_s fields hold KiB/s.
     global_upload_limit = int(network.upload_speed_mbps * 1_000_000 / 8 * 0.8 / 1024)
     explanations["upload_limit"] = (
         "80% от скорости отдачи. Оставляет 20% для ACK-пакетов TCP."
@@ -328,8 +328,8 @@ def calculate_optimal_settings(
         explanations["super_seeding"] = "Выключен."
     
     return OptimizedSettings(
-        global_upload_limit_kbps=global_upload_limit,
-        global_download_limit_kbps=global_download_limit,
+        global_upload_limit_kib_s=global_upload_limit,
+        global_download_limit_kib_s=global_download_limit,
         upload_slots_global=upload_slots_global,
         upload_slots_per_torrent=upload_slots_per_torrent,
         max_connections_global=max_connections,

@@ -50,8 +50,8 @@ def recommended_preferences(settings, current, libtorrent):
     libtorrent 2 has no legacy disk cache/coalescing settings.
     """
     candidates = {
-        "up_limit": settings.global_upload_limit_kbps * 1024,
-        "dl_limit": settings.global_download_limit_kbps * 1024,
+        "up_limit": settings.global_upload_limit_kib_s * 1024,
+        "dl_limit": settings.global_download_limit_kib_s * 1024,
         "max_connec": settings.max_connections_global,
         "max_connec_per_torrent": settings.max_connections_per_torrent,
         "max_uploads": settings.upload_slots_global,
@@ -144,7 +144,7 @@ class OptimizationCycle:
             self.verified = False
             raise ClientError("Applied settings changed; readback no longer matches.")
         if traffic_before.get('dl_info_speed', 0) + traffic_before.get('up_info_speed', 0) <= 0:
-            raise ClientError('No active download or upload traffic. Start a fresh Ubuntu test or resume your torrents before measuring. No result was saved.')
+            raise ClientError('No active download or upload traffic. Start a fresh test download or resume your torrents before measuring. No result was saved.')
         torrents_before = self.client.torrents()
         active = sorted(t["hash"] for t in torrents_before
                         if t.get("state") in {"downloading", "uploading", "forcedDL", "forcedUP", "stalledDL", "stalledUP"})
@@ -159,12 +159,12 @@ class OptimizationCycle:
                                 if t.get('state') in ('downloading', 'forcedDL') and (t.get('progress') or 0) < 1}
             if not before_downloads.issubset(downloading):
                 raise ClientError('The before test used a download that is now complete or stopped. '
-                                  'Start a fresh Ubuntu after test or restore the same downloading workload. No speed result was saved.')
+                                  'Start a fresh download for the after test or restore the same downloading workload. No speed result was saved.')
         def check_downloads(torrents):
             finished = [t for t in torrents if t.get('hash') in downloading and t.get('progress', 0) >= 1]
             if finished:
                 raise ClientError('A download completed during the speed test. No result was saved. '
-                                  'The Ubuntu ISO is too small for a full test at this speed; use a larger active workload. '
+                                  'The test image is too small for a full test at this speed; use a larger active workload. '
                                   'Applied settings are kept; Undo is available in Results.')
         check_downloads(torrents_before)
         def wait(seconds):
@@ -282,7 +282,11 @@ class OptimizationCycle:
         self.original = dict(self.plan["before"])
         self.applied = dict(self.plan["after"])
         self.verified = False
-        self.persist()  # Durable rollback values BEFORE any mutation.
+        try:
+            self.persist()  # Durable rollback values BEFORE any mutation.
+        except OSError:
+            self.original = self.applied = None  # No API write has been attempted.
+            raise
         try:
             self.client.set_preferences(self.applied)
             for _ in range(10):
@@ -302,6 +306,8 @@ class OptimizationCycle:
     def rollback(self):
         if self.original is None:
             raise ClientError("No backup is available for this cycle.")
+        self.verified = False
+        self.persist()  # A failed or partial restore must not retain verified status.
         current = self.client.preferences()
         if any(current.get(k) not in (v, (self.applied or {}).get(k)) for k, v in self.original.items()):
             raise ClientError("Settings were edited outside this cycle. Rollback blocked to avoid overwriting unrelated changes; the backup is preserved.")
@@ -313,7 +319,6 @@ class OptimizationCycle:
             time.sleep(0.2)
         else:
             raise ClientError("Rollback could not be verified. Backup has been preserved.")
-        self.verified = False
         self.original = None
         self.applied = None
         self.plan = None

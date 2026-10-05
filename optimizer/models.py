@@ -87,9 +87,9 @@ class UsageSettings:
 @dataclass
 class OptimizedSettings:
     """Рассчитанные оптимальные настройки."""
-    # Connection limits. Legacy *_kbps names represent KiB/s, not kilobits/s.
-    global_upload_limit_kbps: int
-    global_download_limit_kbps: int
+    # Connection limits. *_kib_s values represent kibibytes per second.
+    global_upload_limit_kib_s: int
+    global_download_limit_kib_s: int
     upload_slots_global: int
     upload_slots_per_torrent: int
     max_connections_global: int

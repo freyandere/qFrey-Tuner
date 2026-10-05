@@ -5,6 +5,7 @@
 
 import os
 import ctypes
+import psutil
 from pathlib import Path
 
 try:
@@ -16,39 +17,12 @@ class HardwareDetector:
     """Определение характеристик системы."""
 
     @staticmethod
-    def get_total_ram_gb() -> float:
+    def get_total_ram_gb() -> float | None:
         """Получить общий объем RAM в ГБ."""
         try:
-            if win32com:
-                wmi = win32com.client.GetObject("winmgmts:")
-                mem = wmi.ExecQuery("SELECT TotalPhysicalMemory FROM Win32_ComputerSystem")[0]
-                return round(int(mem.TotalPhysicalMemory) / (1024**3), 1)
-        except Exception as e:
-            print(f"Error detecting RAM via WMI: {e}")
-            
-        # Fallback via ctypes (Windows)
-        try:
-            class MEMORYSTATUSEX(ctypes.Structure):
-                _fields_ = [
-                    ("dwLength", ctypes.c_ulong),
-                    ("dwMemoryLoad", ctypes.c_ulong),
-                    ("ullTotalPhys", ctypes.c_ulonglong),
-                    ("ullAvailPhys", ctypes.c_ulonglong),
-                    ("ullTotalPageFile", ctypes.c_ulonglong),
-                    ("ullAvailPageFile", ctypes.c_ulonglong),
-                    ("ullTotalVirtual", ctypes.c_ulonglong),
-                    ("ullAvailVirtual", ctypes.c_ulonglong),
-                    ("sullAvailExtendedVirtual", ctypes.c_ulonglong),
-                ]
-            
-            stat = MEMORYSTATUSEX()
-            stat.dwLength = ctypes.sizeof(stat)
-            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
-            return round(stat.ullTotalPhys / (1024**3), 1)
-        except Exception:
-            pass
-            
-        return 8.0  # Default fallback
+            return round(psutil.virtual_memory().total / 1024**3, 1)
+        except (OSError, RuntimeError):
+            return None  # Leave the manual RAM selection unchanged.
 
     @staticmethod
     def get_cpu_info() -> dict:

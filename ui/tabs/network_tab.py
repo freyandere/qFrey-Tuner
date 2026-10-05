@@ -1,11 +1,7 @@
 """Вкладка настроек сети (CustomTkinter)."""
 
 import customtkinter as ctk
-from typing import Optional
 from optimizer.models import ConnectionType, NetworkSettings
-from optimizer.network_tester import NetworkTester
-import threading
-import queue
 from ui.tooltip import tooltip
 
 SPEED_VALUES = [50, 100, 200, 300, 500, 800, 1000, 2500]
@@ -14,22 +10,17 @@ DEFAULT_SPEED_INDEX = 1
 class NetworkTab(ctk.CTkScrollableFrame):
     """Вкладка для ввода параметров сети."""
 
-    def __init__(self, master):
+    def __init__(self, master, controller):
         super().__init__(master, fg_color="transparent")
-        from ui.tabs.benchmark_tab import card
+        from ui.tabs import card
         card(self, 'Your internet connection', 'Set the speed available to qBittorrent. Upload capacity determines how much room to leave for other apps.')
 
-        self.tester = NetworkTester()
-        self._download_touched = False
-        self._upload_touched = False
         self.download_mbps = 100.0
         self.measured_download_mbps = None
         self.upload_mbps = 100.0
-        self._test_results = queue.Queue()
-        self._testing = False
 
+        self.controller = controller
         self._setup_ui()
-        self.after(100, self._poll_speedtest)
 
     def _update_connection_detail(self, *_):
         from ui.selection_details import CONNECTION_DETAILS
@@ -73,7 +64,7 @@ class NetworkTab(ctk.CTkScrollableFrame):
             hover_color="#234c23",
             border_color="#198754",
             border_width=1,
-            command=self._run_speedtest
+            command=self.controller.run_network_test
         )
         self.test_btn.pack(padx=10, pady=5, fill="x")
 
@@ -133,42 +124,19 @@ class NetworkTab(ctk.CTkScrollableFrame):
         self.download_mbps = float(speed)
         self.measured_download_mbps = None
         self.dl_label.configure(text=f"Download: {speed} Mbps")
-        self._download_touched = True
 
     def _on_ul_slider(self, value):
         idx = int(value)
         speed = SPEED_VALUES[idx]
         self.upload_mbps = float(speed)
         self.ul_label.configure(text=f"Upload: {speed} Mbps")
-        self._upload_touched = True
 
     def _on_vpn_toggle(self):
         state = "normal" if self.vpn_check.get() else "disabled"
         self.vpn_entry.configure(state=state)
 
-    def _run_speedtest(self):
-        self._testing = True
-        self.test_btn.configure(state="disabled", text="Testing... (Wait ~20s)")
-
-        def run():
-            try:
-                self._test_results.put(NetworkTester.run_full_test())
-            except Exception:
-                self._test_results.put((0, 0, "Failed; previous speeds retained"))
-
-        threading.Thread(target=run, daemon=True).start()
-
-    def _poll_speedtest(self):
-        try:
-            dl, ul, server = self._test_results.get_nowait()
-            self._on_test_finished(dl, ul, server)
-        except queue.Empty:
-            pass
-        self.after(100, self._poll_speedtest)
-
     def _on_test_finished(self, dl, ul, server):
-        self._testing = False
-        self.test_btn.configure(state="normal", text=f"Result: {server}")
+        self.test_btn.configure(text=f"Result: {server}")
 
         if dl > 0:
             # Find closest index
@@ -187,9 +155,6 @@ class NetworkTab(ctk.CTkScrollableFrame):
             self.ul_label.configure(text=f"Upload: {ul:.1f} Mbps (measured)")
 
     def get_settings(self) -> NetworkSettings:
-        dl_idx = int(self.dl_slider.get())
-        ul_idx = int(self.ul_slider.get())
-
         # Map string back to Enum
         conn_str = self.conn_type_var.get()
         conn_enum = next((t for t in ConnectionType if t.value == conn_str), ConnectionType.FIBER)

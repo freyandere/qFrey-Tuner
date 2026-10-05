@@ -19,7 +19,9 @@ uv run --extra dev python tests/verify_startup.py
 if errorlevel 1 goto failed
 uv run --extra dev pyinstaller qFrey-Tuner.spec --noconfirm --clean
 if errorlevel 1 goto failed
-echo Build completed. The versioned executable is in dist/.
+uv run --extra dev python -c "import shutil,tomllib; from pathlib import Path; version=tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version']; Path('outputs').mkdir(exist_ok=True); shutil.copy2(f'dist/qFrey-Tuner_v{version}.exe', 'outputs/qFrey-Tuner.exe')"
+if errorlevel 1 goto failed
+echo Build completed: outputs\qFrey-Tuner.exe. Versioned executable: dist/.
 exit /b 0
 :failed
 echo Build stopped because a prerequisite, test or packaging check failed.

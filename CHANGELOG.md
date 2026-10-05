@@ -1,5 +1,8 @@
 # Changelog
 
+## [0.3.4] - 2026-10-05
+- Simplify architecture; serialize measurements; clarify backup and historical results; unify launcher build path.
+
 All notable changes to this project will be documented in this file.
 
 ## [v0.2.9.1] - 2026-02-06

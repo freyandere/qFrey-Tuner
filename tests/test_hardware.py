@@ -4,16 +4,15 @@ from unittest.mock import MagicMock, patch
 from optimizer.hardware_detector import HardwareDetector
 
 def test_get_total_ram_gb(mocker):
-    # Mock WMI
-    mock_wmi = MagicMock()
-    mock_mem = MagicMock()
-    mock_mem.TotalPhysicalMemory = 17179869184 # 16 GB
-    mock_wmi.ExecQuery.return_value = [mock_mem]
-    
-    mocker.patch("win32com.client.GetObject", return_value=mock_wmi)
+    mocker.patch('optimizer.hardware_detector.psutil.virtual_memory', return_value=MagicMock(total=17179869184))
     
     ram = HardwareDetector.get_total_ram_gb()
     assert ram == 16.0
+
+
+def test_ram_detection_failure_keeps_manual_choice(mocker):
+    mocker.patch('optimizer.hardware_detector.psutil.virtual_memory', side_effect=OSError('unavailable'))
+    assert HardwareDetector.get_total_ram_gb() is None
 
 def test_get_cpu_info_hybrid(mocker):
     # Mock OS info

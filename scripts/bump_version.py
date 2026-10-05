@@ -1,5 +1,7 @@
 import argparse
-import toml
+import re
+import tomllib
+from pathlib import Path
 import os
 from datetime import datetime
 
@@ -7,8 +9,9 @@ PYPROJECT_PATH = "pyproject.toml"
 CHANGELOG_PATH = "CHANGELOG.md"
 
 def bump_version(part='patch'):
-    with open(PYPROJECT_PATH, 'r', encoding='utf-8') as f:
-        data = toml.load(f)
+    path = Path(PYPROJECT_PATH)
+    source = path.read_text(encoding='utf-8')
+    data = tomllib.loads(source)
     
     current_version = data['project']['version']
     major, minor, patch = map(int, current_version.split('.'))
@@ -24,10 +27,16 @@ def bump_version(part='patch'):
         patch += 1
         
     new_version = f"{major}.{minor}.{patch}"
-    data['project']['version'] = new_version
-    
-    with open(PYPROJECT_PATH, 'w', encoding='utf-8') as f:
-        toml.dump(data, f)
+    section = re.search(r'(?ms)^\[project\][^\n]*\n(?P<body>.*?)(?=^\[|\Z)', source)
+    if section is None:
+        raise ValueError('Missing project section')
+    body, count = re.subn(r'(?m)^(version\s*=\s*)([\"\x27])[^\"\x27]+\2',
+                         lambda match: f'{match[1]}{match[2]}{new_version}{match[2]}', section['body'])
+    if count != 1:
+        raise ValueError('Expected exactly one project version')
+    updated = source[:section.start('body')] + body + source[section.end('body'):]
+    assert tomllib.loads(updated)['project']['version'] == new_version
+    path.write_text(updated, encoding='utf-8')
         
     return current_version, new_version
 

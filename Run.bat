@@ -4,14 +4,6 @@ chcp 65001 >nul
 title qFrey-Tuner
 cd /d "%~dp0"
 
-if exist "outputs\qFrey-Tuner_v0.3.3.exe" (
-    start "" "outputs\qFrey-Tuner_v0.3.3.exe"
-    exit /b 0
-)
-if exist "outputs\qFrey-Tuner_v0.3.2.exe" (
-    start "" "outputs\qFrey-Tuner_v0.3.2.exe"
-    exit /b 0
-)
 if exist "outputs\qFrey-Tuner.exe" (
     start "" "outputs\qFrey-Tuner.exe"
     exit /b 0

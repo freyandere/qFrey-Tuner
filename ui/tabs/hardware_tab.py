@@ -14,7 +14,7 @@ class HardwareTab(ctk.CTkScrollableFrame):
 
     def __init__(self, master):
         super().__init__(master, fg_color="transparent")
-        from ui.tabs.benchmark_tab import card
+        from ui.tabs import card
         card(self, 'The computer running qBittorrent', 'Choose its memory and download drive. These control how much work can run without overwhelming your computer.')
         self.detector = HardwareDetector()
         self._setup_ui()
@@ -112,9 +112,10 @@ class HardwareTab(ctk.CTkScrollableFrame):
         self.disk_status.configure(text=f"Selected volume: {disk}." if disk != "Unknown" else "Storage could not be identified. Select the actual download drive type manually.")
         # RAM
         ram = self.detector.get_total_ram_gb()
-        idx = min(range(len(RAM_VALUES)), key=lambda i: abs(RAM_VALUES[i] - ram))
-        self.ram_slider.set(idx)
-        self._on_ram_slider(idx)
+        if ram is not None:
+            idx = min(range(len(RAM_VALUES)), key=lambda i: abs(RAM_VALUES[i] - ram))
+            self.ram_slider.set(idx)
+            self._on_ram_slider(idx)
 
         # CPU
         cpu = self.detector.get_cpu_info()

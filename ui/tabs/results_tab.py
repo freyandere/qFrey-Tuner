@@ -1,7 +1,8 @@
 """Readable preference review and separate measured outcomes."""
 import tkinter as tk
 import customtkinter as ctk
-from ui.tabs.benchmark_tab import card
+from ui.tabs import card
+from optimizer.behavior_report import behavior_report
 
 LABELS = {
     'up_limit': ('Upload speed limit', 'Leave room for browsing and other apps.'),
@@ -103,6 +104,11 @@ class OutcomeTab(ctk.CTkScrollableFrame):
         self.peer_curve.pack(fill='x', padx=16, pady=(0, 16))
         for canvas in (self.speed_curve, self.peer_curve):
             canvas.bind('<Configure>', lambda _: self.draw_ramp())
+        behavior = card(self, 'What changed in qBittorrent behavior',
+                        'Measured outcomes and the purpose of the applied settings are shown separately.')
+        self.behavior_summary = ctk.CTkLabel(behavior, text=behavior_report(None, None),
+                                           justify='left', anchor='w', wraplength=720)
+        self.behavior_summary.pack(fill='x', padx=16, pady=(0, 16))
         self.saved = ctk.CTkLabel(self, text='No changes saved yet.', wraplength=720, justify='left', anchor='w')
         self.saved.pack(fill='x', padx=16, pady=12)
         self.rollback_btn = ctk.CTkButton(self, text='Undo this tuning • restore original settings', fg_color='#663e46', command=controller.rollback, state='disabled')
@@ -112,11 +118,28 @@ class OutcomeTab(ctk.CTkScrollableFrame):
     def show_cycle(self, cycle):
         self.cycle = cycle
         complete = bool(cycle.baseline and cycle.optimized)
-        self.summary.configure(text=cycle.comparison() if complete else ('Changes checked in qBittorrent. The second speed test is still needed.' if cycle.original is not None else 'Starting-speed test saved. Review changes, then run the after test.'))
         active = cycle.original is not None
+        summary = cycle.comparison() if complete else (
+            'Changes checked in qBittorrent. The second speed test is still needed.' if active and getattr(cycle, 'verified', False) else
+            'Original values are backed up. Changes are not verified; Undo restores the saved settings.' if active else
+            'Starting-speed test saved. Review changes, then run the after test.')
+        if complete and not active:
+            summary = 'Saved experiment • tuning is no longer applied\n' + summary
+        self.summary.configure(text=summary)
         self.saved.configure(text=('Original values saved before applying. Undo restores only the settings changed by this tuning; it keeps your torrents and downloaded files.\nBackup: ' + str(cycle.path)) if active else 'No tuning is currently applied. The experiment record is retained; torrents and downloaded files are kept.')
         self.draw()
         self.draw_ramp()
+        report = behavior_report(cycle.baseline, cycle.optimized)
+        plan = getattr(cycle, 'plan', None)
+        if complete and plan:
+            changes = ['Applied settings • intended effects (not measured proof)']
+            for key, value in plan['after'].items():
+                title, detail = LABELS.get(key, (key.replace('_', ' ').title(), 'Advanced qBittorrent preference.'))
+                changes.append(f"{title}: {display(key, plan['before'][key])} → {display(key, value)}. {detail}")
+            if plan.get('omitted'):
+                changes.append('Not applied: ' + ' '.join(plan['omitted']))
+            report += '\n\n' + '\n\n'.join(changes)
+        self.behavior_summary.configure(text=report)
 
     def draw(self):
         self.chart.delete('all')

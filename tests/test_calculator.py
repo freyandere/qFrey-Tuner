@@ -27,8 +27,8 @@ def test_calculate_desktop_defaults():
     settings = calculate_optimal_settings(network, hardware, usage)
 
     assert isinstance(settings, OptimizedSettings)
-    assert settings.global_upload_limit_kbps == 9765
-    assert settings.global_upload_limit_kbps * 1024 <= 100 * 1_000_000 / 8 * .8
+    assert settings.global_upload_limit_kib_s == 9765
+    assert settings.global_upload_limit_kib_s * 1024 <= 100 * 1_000_000 / 8 * .8
     assert settings.async_io_threads == 32
     assert settings.anonymous_mode # True for public trackers
     assert settings.enable_dht # True for Public

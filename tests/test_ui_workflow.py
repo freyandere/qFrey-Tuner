@@ -31,7 +31,9 @@ def test_missing_target_locks_navigation_and_actions(window):
 
 
 def test_version_read_and_preserved_environment(window):
-    assert window._get_version() == "0.3.3"
+    import tomllib
+    source = Path(__file__).resolve().parents[1] / 'pyproject.toml'
+    assert window._get_version() == tomllib.loads(source.read_text(encoding='utf-8'))['project']['version']
     assert window.usage_tab.get_settings().environment == window.config_manager.profile
 
 
@@ -253,3 +255,71 @@ def test_result_ramp_curves_render_without_requiring_old_result_fields(window):
     assert len(window.outcome_tab.peer_curve.find_all()) > 10
     assert 'Before' in window.outcome_tab.ramp_summary.cget('text')
     assert 'After' in window.outcome_tab.ramp_summary.cget('text')
+
+
+@pytest.mark.parametrize('network_first', [True, False])
+def test_network_and_torrent_jobs_cannot_overlap(window, monkeypatch, network_first):
+    from unittest.mock import Mock
+    workers = []
+    monkeypatch.setattr('ui.main_window.threading.Thread', lambda **kwargs: workers.append(kwargs['target']) or Mock())
+    monkeypatch.setattr('ui.main_window.NetworkTester.run_full_test', lambda: (300, 30, 'test'))
+    try:
+        if network_first:
+            window.run_network_test()
+            window._job(lambda: None, Mock(), measuring=True)
+        else:
+            window._job(lambda: None, Mock(), measuring=True)
+            window.run_network_test()
+        assert len(workers) == 1
+        assert window.busy
+        assert window.network_tab.test_btn.cget('state') == 'disabled'
+        workers[0]()
+        window._drain()
+        assert not window.busy
+        assert window.network_tab.test_btn.cget('state') == 'normal'
+    finally:
+        window.busy = False
+        window._measuring = False
+        window._control_state = None
+        window._controls()
+
+
+@pytest.mark.parametrize('verified', [True, False])
+def test_error_distinguishes_backup_from_verified_application(window, monkeypatch, verified):
+    from types import SimpleNamespace
+    monkeypatch.setattr('ui.main_window.messagebox.showerror', lambda *args, **kwargs: None)
+    window.cycle = SimpleNamespace(baseline=None, plan=None, original={'up_limit': 0}, verified=verified)
+    try:
+        window.events.put(('error', 'Test failure'))
+        window._drain()
+        text = window.results_tab.summary.cget('text')
+        assert ('Verified settings remain applied' if verified else 'application could not be verified') in text
+    finally:
+        window.cycle = None
+        window._controls()
+
+
+def test_saved_results_are_marked_as_historical_after_undo(window):
+    from types import SimpleNamespace
+    data = {'mean_download_mib_s': 50, 'mean_upload_mib_s': 0}
+    window.outcome_tab.show_cycle(SimpleNamespace(baseline=data, optimized=data,
+        original=None, path='test.json', comparison=lambda: 'Observed difference'))
+    assert 'tuning is no longer applied' in window.outcome_tab.summary.cget('text')
+
+
+def test_network_failure_unlocks_controls_and_retains_speed_inputs(window, monkeypatch):
+    from unittest.mock import Mock
+    workers = []
+    def failed():
+        raise OSError('network unavailable')
+    monkeypatch.setattr('ui.main_window.threading.Thread', lambda **kwargs: workers.append(kwargs['target']) or Mock())
+    monkeypatch.setattr('ui.main_window.NetworkTester.run_full_test', failed)
+    monkeypatch.setattr('ui.main_window.messagebox.showerror', lambda *args, **kwargs: None)
+    before = window.network_tab.get_settings()
+    window.run_network_test()
+    workers[0]()
+    window._drain()
+    assert not window.busy
+    assert window.network_tab.test_btn.cget('state') == 'normal'
+    assert window.network_tab.test_btn.cget('text') == 'Retry internet speed test'
+    assert window.network_tab.get_settings() == before
