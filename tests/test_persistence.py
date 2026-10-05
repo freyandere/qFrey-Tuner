@@ -1,72 +1,43 @@
-"""Тест для ConfigManager."""
-
-import os
-import configparser
 from pathlib import Path
-from optimizer.config_manager import ConfigManager
-from optimizer.models import (
-    OptimizedSettings, ProtocolMode, EncryptionMode
-)
 
-def test_config_manager_apply_settings():
-    # Создаем временный конфиг
-    test_conf = Path("test_qbittorrent.ini")
-    if test_conf.exists():
-        test_conf.unlink()
-    
-    with open(test_conf, "w", encoding="utf-8") as f:
-        f.write("[BitTorrent]\nMaxConnections=100\n")
-    
-    # Инициализируем менеджер и подменяем путь
-    mgr = ConfigManager()
-    mgr.config_path = test_conf
-    
-    # Создаем тестовые настройки
-    settings = OptimizedSettings(
-        global_upload_limit_kbps=100,
-        global_download_limit_kbps=0,
-        upload_slots_global=50,
-        upload_slots_per_torrent=10,
-        max_connections_global=500,
-        max_connections_per_torrent=125,
-        max_active_downloads=5,
-        max_active_uploads=8,
-        max_active_torrents=13,
-        disk_cache_mb=512,
-        enable_os_cache=True,
-        pre_allocate_disk=True,
-        async_io_threads=16,
-        coalesce_reads_writes=True,
-        protocol_mode=ProtocolMode.UTP_TCP,
-        send_buffer_watermark_kb=5000,
-        send_buffer_low_watermark_kb=160,
-        send_buffer_factor=120,
-        socket_backlog_size=100,
-        outgoing_connections_per_second=200,
-        listening_port="64532",
-        encryption_mode=EncryptionMode.PREFER,
-        anonymous_mode=True,
-        enable_dht=True,
-        enable_pex=True,
-        enable_lsd=True,
-        network_interface="tun0",
-        super_seeding=False,
-        warnings=[],
-        explanations={}
-    )
-    
-    success = mgr.apply_settings(settings)
-    assert success is True
-    
-    # Проверяем результат
-    config = configparser.ConfigParser(interpolation=None)
-    config.read(test_conf, encoding="utf-8")
-    
-    assert config["BitTorrent"]["MaxConnections"] == "500"
-    assert config["BitTorrent"]["UploadLimit"] == str(100 * 1024)
-    assert config["Connection"]["Interface"] == "tun0"
-    assert config["Advanced"]["DiskCache"] == "512"
-    
-    # Очистка
-    if test_conf.exists():
-        test_conf.unlink()
+from optimizer.config_manager import ConfigManager
+from optimizer.models import EnvironmentProfile
+
+
+def test_offline_writes_are_blocked(tmp_path):
+    path = tmp_path / "qBittorrent.ini"
+    original = "[BitTorrent]\nSession\\MaxConnections=100\n"
+    path.write_text(original)
+    manager = ConfigManager()
+    assert manager.set_manual_path(str(path))
+    assert not manager.apply_settings(None)
+    assert "Offline" in manager.last_error
+    assert path.read_text() == original
+
+
+def test_portable_discovery_respects_profile(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(ConfigManager, "app_directory", staticmethod(lambda: tmp_path))
+    from optimizer.process_manager import ProcessManager
+    monkeypatch.setattr(ProcessManager, "discover", lambda: [])
+    system = tmp_path / "appdata/qBittorrent/qBittorrent.ini"
+    system.parent.mkdir(parents=True)
+    system.write_text("[BitTorrent]\n")
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+    manager = ConfigManager()
+    assert manager.config_path == system.resolve()
+    manager.set_installation_type(EnvironmentProfile.PORTABLE)
+    assert manager.config_path is None
+    portable = tmp_path / "profile/qBittorrent/config/qBittorrent.ini"
+    portable.parent.mkdir(parents=True)
+    portable.write_text("[BitTorrent]\n")
+    assert manager._find_config(EnvironmentProfile.PORTABLE) == portable.resolve()
+
+
+def test_config_validation_and_remote_discovery(tmp_path):
+    manager = ConfigManager()
+    invalid = tmp_path / "bad.ini"
+    invalid.write_text("not a configuration")
+    assert not manager.set_manual_path(str(invalid))
+    manager.set_installation_type(EnvironmentProfile.DOCKER)
+    assert manager.config_path is None

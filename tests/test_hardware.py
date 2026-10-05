@@ -45,21 +45,15 @@ def test_get_cpu_info_hybrid(mocker):
     # On non-hybrid systems in tests (mocking failure), it should fall back to WMI sum
     assert cpu_info["physical_cores"] >= 1
 
-def test_get_main_disk_type_msft(mocker):
-    # Mock WMI for root\Microsoft\Windows\Storage
-    mock_storage_wmi = MagicMock()
-    mock_disk = MagicMock()
-    mock_disk.Model = "Samsung NVMe"
-    mock_disk.BusType = 17 # NVMe
-    mock_disk.MediaType = 4 # SSD
-    mock_storage_wmi.ExecQuery.return_value = [mock_disk]
-    
-    def mock_get_object(path):
-        if "Storage" in path:
-            return mock_storage_wmi
-        return MagicMock() # Other WMI
-        
-    mocker.patch("win32com.client.GetObject", side_effect=mock_get_object)
-    
-    disk_type = HardwareDetector.get_main_disk_type()
-    assert disk_type == "NVMe"
+@pytest.mark.parametrize("bus,media,expected", [("NVMe","SSD","NVMe"), ("USB","SSD","SSD"), ("SATA","HDD","HDD"), ("USB","Unspecified","Unknown")])
+def test_selected_volume_storage(mocker, bus, media, expected):
+    mocker.patch("ctypes.WinDLL", side_effect=OSError("device query unavailable"))
+    import json
+    result = MagicMock(stdout=json.dumps({"Bus": bus, "Media": media}))
+    run = mocker.patch("subprocess.run", return_value=result)
+    assert HardwareDetector.get_main_disk_type("E:\\Downloads") == expected
+    assert "-DriveLetter 'E'" in run.call_args.args[0][-1]
+
+
+def test_unc_storage_is_not_guessed():
+    assert HardwareDetector.get_main_disk_type(r"\\server\share") == "Unknown"

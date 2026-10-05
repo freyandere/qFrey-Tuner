@@ -1,164 +1,94 @@
-"""Вкладка сценария использования."""
+"""Вкладка сценария использования (CustomTkinter)."""
 
-from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QRadioButton,
-    QButtonGroup,
-    QGroupBox,
-    QLabel,
-)
-from PyQt6.QtCore import Qt
-
+import customtkinter as ctk
 from optimizer.models import TrackerType, UserRole, EnvironmentProfile, UsageSettings
 
-
-class UsageTab(QWidget):
+class UsageTab(ctk.CTkScrollableFrame):
     """Вкладка для выбора сценария использования."""
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        # The instruction implies a change to how the environment is set or selected.
-        # The provided snippet adds items to a non-existent self.env_combo.
-        # Assuming the intent is to change the initial default environment to SYSTEM,
-        # and that the env_combo part is either a future addition or a misunderstanding
-        # in the provided snippet's context.
-        # If the user intended to add a QComboBox, more context would be needed for its creation.
-        # For now, I will interpret "Update UsageTab to use EnvironmentProfile.SYSTEM"
-        # as changing the initial default value.
+
+    def __init__(self, master):
+        super().__init__(master, fg_color="transparent")
+        from ui.tabs.benchmark_tab import card
+        card(self, 'How you use torrents', 'Choose your priorities and tracker type. These guide sharing limits, download queues and peer discovery.')
         self._environment = EnvironmentProfile.SYSTEM
         self._setup_ui()
-    
+
     def _setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setSpacing(16)
-        
-        # === Тип трекеров (ОБЯЗАТЕЛЬНО) ===
-        tracker_group = QGroupBox("Тип трекеров *")
-        tracker_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        tracker_layout = QVBoxLayout(tracker_group)
-        
-        self.tracker_group = QButtonGroup(self)
-        
-        # Public
-        self.public_radio = QRadioButton("Публичные трекеры (rutracker, 1337x, и т.д.)")
-        self.public_radio.setChecked(True)
-        self.tracker_group.addButton(self.public_radio)
-        tracker_layout.addWidget(self.public_radio)
-        
-        public_hint = QLabel("  DHT, PeX, LSD включены; Anonymous Mode активен")
-        public_hint.setStyleSheet("color: #28a745; font-size: 11px; margin-left: 20px;")
-        tracker_layout.addWidget(public_hint)
-        
-        # Private
-        self.private_radio = QRadioButton("Приватные трекеры (с учётом ratio)")
-        self.tracker_group.addButton(self.private_radio)
-        tracker_layout.addWidget(self.private_radio)
-        
-        private_hint = QLabel("  DHT/PeX OFF, Anonymous OFF, Upload slots = 4-8")
-        private_hint.setStyleSheet("color: #ff6b6b; font-size: 11px; margin-left: 20px;")
-        tracker_layout.addWidget(private_hint)
-        
-        layout.addWidget(tracker_group)
-        
-        # === Роль ===
-        role_group = QGroupBox("Ваша роль")
-        role_layout = QVBoxLayout(role_group)
-        
-        role_label = QLabel("Выберите основной сценарий использования:")
-        role_label.setStyleSheet("color: #bbb;")
-        role_layout.addWidget(role_label)
-        
-        self.role_group = QButtonGroup(self)
-        
-        # Leecher
-        self.leecher_radio = QRadioButton("Личер — в основном скачиваю")
-        self.leecher_radio.setChecked(True)
-        self.role_group.addButton(self.leecher_radio)
-        role_layout.addWidget(self.leecher_radio)
-        
-        leecher_hint = QLabel("  Приоритет на скорость загрузки")
-        leecher_hint.setStyleSheet("color: #aaa; font-size: 11px; margin-left: 20px;")
-        role_layout.addWidget(leecher_hint)
-        
-        # Seeder
-        self.seeder_radio = QRadioButton("Сидер — раздаю много торрентов")
-        self.role_group.addButton(self.seeder_radio)
-        role_layout.addWidget(self.seeder_radio)
-        
-        seeder_hint = QLabel("  Приоритет на стабильную отдачу, больше слотов")
-        seeder_hint.setStyleSheet("color: #aaa; font-size: 11px; margin-left: 20px;")
-        role_layout.addWidget(seeder_hint)
-        
-        # Uploader
-        self.uploader_radio = QRadioButton("Аплоадер — создаю новые раздачи")
-        self.role_group.addButton(self.uploader_radio)
-        role_layout.addWidget(self.uploader_radio)
-        
-        uploader_hint = QLabel("  Super Seeding для быстрого распространения")
-        uploader_hint.setStyleSheet("color: #aaa; font-size: 11px; margin-left: 20px;")
-        role_layout.addWidget(uploader_hint)
-        
-        layout.addWidget(role_group)
-        
-        # === Справка ===
-        info_group = QGroupBox("Справка")
-        info_layout = QVBoxLayout(info_group)
-        
-        info_text = QLabel(
-            "<span style='color: #e0e0e0;'>"
-            "<b style='color: #6ea8fe;'>Публичные трекеры:</b> DHT и PeX помогают найти пиров<br><br>"
-            "<b style='color: #ff6b6b;'>Приватные трекеры:</b> DHT/PeX могут привести к бану! "
-            "Upload slots ограничены для «гонки» (racing)<br><br>"
-            "<b style='color: #ffc107;'>Super Seeding:</b> Раздаёт каждый кусок только одному пиру"
-            "</span>"
+        # Tracker Type
+        self.tracker_frame = ctk.CTkFrame(self)
+        self.tracker_frame.pack(fill="x", pady=10)
+
+        ctk.CTkLabel(self.tracker_frame, text="Tracker Type", font=("Segoe UI", 14, "bold")).pack(anchor="w", padx=10, pady=5)
+
+        self.tracker_var = ctk.StringVar(value="Public")
+
+        self.public_radio = ctk.CTkRadioButton(
+            self.tracker_frame,
+            text="Public Trackers (rutracker, 1337x)",
+            variable=self.tracker_var,
+            value="Public"
         )
-        info_text.setWordWrap(True)
-        info_text.setTextFormat(Qt.TextFormat.RichText)
-        info_layout.addWidget(info_text)
-        
-        layout.addWidget(info_group)
-        
-        layout.addStretch()
-    
+        self.public_radio.pack(anchor="w", padx=10, pady=5)
+
+        ctk.CTkLabel(self.tracker_frame, text="  Peer discovery enabled • share fewer client details", text_color="#28a745", font=("Segoe UI", 11)).pack(anchor="w", padx=20)
+
+        self.private_radio = ctk.CTkRadioButton(
+            self.tracker_frame,
+            text="Private Trackers (Ratio-based)",
+            variable=self.tracker_var,
+            value="Private"
+        )
+        self.private_radio.pack(anchor="w", padx=10, pady=5)
+
+        ctk.CTkLabel(self.tracker_frame, text="  DHT/PeX OFF, Anon OFF, Strict Slots", text_color="#ff6b6b", font=("Segoe UI", 11)).pack(anchor="w", padx=20, pady=(0, 10))
+
+        # User Role
+        self.role_frame = ctk.CTkFrame(self)
+        self.role_frame.pack(fill="x", pady=10)
+
+        ctk.CTkLabel(self.role_frame, text="primary Goal (Role)", font=("Segoe UI", 14, "bold")).pack(anchor="w", padx=10, pady=5)
+
+        self.role_var = ctk.StringVar(value="Leecher")
+
+        roles = [
+            ("Leecher", "Prioritize Download Speed", "Leecher"),
+            ("Seeder", "Prioritize Upload Stability", "Seeder"),
+            ("Uploader", "Initial distribution; super seeding remains a manual per-torrent setting", "Uploader")
+        ]
+
+        for text, hint, val in roles:
+            r = ctk.CTkRadioButton(self.role_frame, text=text, variable=self.role_var, value=val)
+            r.pack(anchor="w", padx=10, pady=5)
+            ctk.CTkLabel(self.role_frame, text=f"  {hint}", text_color="#aaaaaa", font=("Segoe UI", 11)).pack(anchor="w", padx=20)
+
     def set_environment(self, env: EnvironmentProfile):
-        """Установить среду (из Welcome Dialog)."""
         self._environment = env
 
     def set_settings(self, settings: UsageSettings):
-        """Восстановить сценарий использования."""
         self._environment = settings.environment
-        
-        if settings.tracker_type == TrackerType.PUBLIC:
-            self.public_radio.setChecked(True)
-        else:
-            self.private_radio.setChecked(True)
-            
-        if settings.user_role == UserRole.LEECHER:
-            self.leecher_radio.setChecked(True)
-        elif settings.user_role == UserRole.SEEDER:
-            self.seeder_radio.setChecked(True)
-        else:
-            self.uploader_radio.setChecked(True)
 
-    
-    def get_settings(self) -> UsageSettings:
-        """Получить выбранный сценарий использования."""
-        if self.public_radio.isChecked():
-            tracker_type = TrackerType.PUBLIC
+        self.tracker_var.set("Public" if settings.tracker_type == TrackerType.PUBLIC else "Private")
+
+        if settings.user_role == UserRole.LEECHER:
+            self.role_var.set("Leecher")
+        elif settings.user_role == UserRole.SEEDER:
+            self.role_var.set("Seeder")
         else:
-            tracker_type = TrackerType.PRIVATE
-        
-        if self.leecher_radio.isChecked():
+            self.role_var.set("Uploader")
+
+    def get_settings(self) -> UsageSettings:
+        t_type = TrackerType.PUBLIC if self.tracker_var.get() == "Public" else TrackerType.PRIVATE
+
+        role_str = self.role_var.get()
+        if role_str == "Leecher":
             role = UserRole.LEECHER
-        elif self.seeder_radio.isChecked():
+        elif role_str == "Seeder":
             role = UserRole.SEEDER
         else:
             role = UserRole.UPLOADER
-        
+
         return UsageSettings(
-            tracker_type=tracker_type, 
+            tracker_type=t_type,
             user_role=role,
-            environment=self._environment,
+            environment=self._environment
         )

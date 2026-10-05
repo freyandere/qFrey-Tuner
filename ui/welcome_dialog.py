@@ -1,242 +1,166 @@
-"""Диалог приветствия для выбора среды установки."""
+"""Диалог выбора режима установки (CustomTkinter)."""
 
-from PyQt6.QtWidgets import (
-    QDialog,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QFrame,
-    QGridLayout,
-)
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
-
+import customtkinter as ctk
+from typing import Optional
 from optimizer.models import EnvironmentProfile
 
-
-# Данные профилей: иконка, название, описание
+# Данные профилей
 PROFILES_DATA = {
     EnvironmentProfile.SYSTEM: {
         "icon": "🖥️",
         "title": "System Desktop",
         "subtitle": "Windows / macOS / Linux",
-        "description": "Стандартная установка. Конфиг ищется в системных папках (%APPDATA% или .config).",
+        "description": "Стандартная установка. Конфиг в %APPDATA%.",
     },
     EnvironmentProfile.PORTABLE: {
         "icon": "🚀",
         "title": "Portable",
         "subtitle": "Windows (EXE folder)",
-        "description": "Портабельная версия. Конфиг ищется в папке с программой или подпапке profile/.",
+        "description": "Портабельная версия. Конфиг рядом с EXE.",
     },
     EnvironmentProfile.TRUENAS: {
         "icon": "🗄️",
         "title": "TrueNAS / ZFS",
         "subtitle": "FreeNAS, TrueNAS",
-        "description": "Disk Cache отключён — ZFS ARC управляет кэшированием.",
+        "description": "ZFS ARC кэш.",
     },
     EnvironmentProfile.NAS: {
         "icon": "📦",
         "title": "NAS",
         "subtitle": "Synology / QNAP",
-        "description": "Настройки для сетевых хранилищ без ZFS.",
+        "description": "Сетевые хранилища.",
     },
     EnvironmentProfile.DOCKER: {
         "icon": "🐳",
         "title": "Docker",
         "subtitle": "Контейнер с VPN",
-        "description": "Привязка к tun0/wg0 внутри контейнера.",
+        "description": "Для Docker контейнеров.",
     },
     EnvironmentProfile.SEEDBOX: {
         "icon": "⚡",
         "title": "Seedbox",
         "subtitle": "1-10 Gbps",
-        "description": "Экстремальные настройки для гигабитных каналов.",
+        "description": "Высокая скорость.",
     },
 }
 
-
-class ProfileCard(QFrame):
+class ProfileCard(ctk.CTkFrame):
     """Карточка выбора профиля."""
-    
-    def __init__(self, profile: EnvironmentProfile, parent=None):
-        super().__init__(parent)
+
+    def __init__(self, master, profile: EnvironmentProfile, on_click):
+        super().__init__(master, corner_radius=10, border_width=2, border_color="#333333", fg_color="#2b2b2b")
         self.profile = profile
+        self.on_click = on_click
         self.selected = False
-        self._setup_ui()
-        self._update_style()
-    
-    def _setup_ui(self):
-        data = PROFILES_DATA[self.profile]
-        
-        self.setFixedSize(160, 120)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(4)
-        
-        # Иконка
-        icon = QLabel(data["icon"])
-        icon.setFont(QFont("Segoe UI Emoji", 28))
-        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(icon)
-        
-        # Название
-        title = QLabel(data["title"])
-        title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("color: #e0e0e0;")
-        layout.addWidget(title)
-        
-        # Подзаголовок
-        subtitle = QLabel(data["subtitle"])
-        subtitle.setFont(QFont("Segoe UI", 9))
-        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle.setStyleSheet("color: #888;")
-        layout.addWidget(subtitle)
-    
-    def _update_style(self):
-        if self.selected:
-            self.setStyleSheet("""
-                ProfileCard {
-                    background: #1a3a5c;
-                    border: 2px solid #0d6efd;
-                    border-radius: 12px;
-                }
-            """)
-        else:
-            self.setStyleSheet("""
-                ProfileCard {
-                    background: #2a2a2a;
-                    border: 1px solid #444;
-                    border-radius: 12px;
-                }
-                ProfileCard:hover {
-                    background: #333;
-                    border-color: #666;
-                }
-            """)
-    
+
+        # Данные
+        data = PROFILES_DATA[profile]
+
+        # Layout
+        self.grid_columnconfigure(0, weight=1)
+
+        # Event binding wrapper
+        def click_handler(event=None):
+            self.on_click(self)
+
+        # Icon
+        self.icon_label = ctk.CTkLabel(self, text=data["icon"], font=("Segoe UI Emoji", 32))
+        self.icon_label.grid(row=0, column=0, pady=(15, 5))
+        self.icon_label.bind("<Button-1>", click_handler)
+
+        # Title
+        self.title_label = ctk.CTkLabel(self, text=data["title"], font=("Segoe UI", 14, "bold"), text_color="#e0e0e0")
+        self.title_label.grid(row=1, column=0, pady=2)
+        self.title_label.bind("<Button-1>", click_handler)
+
+        # Subtitle
+        self.subtitle_label = ctk.CTkLabel(self, text=data["subtitle"], font=("Segoe UI", 11), text_color="#888888")
+        self.subtitle_label.grid(row=2, column=0, pady=(0, 15))
+        self.subtitle_label.bind("<Button-1>", click_handler)
+
+        self.bind("<Button-1>", click_handler)
+        self.bind("<Enter>", self.on_enter)
+        self.bind("<Leave>", self.on_leave)
+
+    def on_enter(self, event):
+        if not self.selected:
+            self.configure(border_color="#555555", fg_color="#333333")
+
+    def on_leave(self, event):
+        if not self.selected:
+            self.configure(border_color="#333333", fg_color="#2b2b2b")
+
     def set_selected(self, selected: bool):
         self.selected = selected
-        self._update_style()
-    
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            # Emit custom signal via parent
-            parent = self.parent()
-            while parent and not isinstance(parent, WelcomeDialog):
-                parent = parent.parent()
-            if parent:
-                parent._on_profile_selected(self.profile)
-        super().mousePressEvent(event)
+        if selected:
+            self.configure(border_color="#1f6feb", fg_color="#1a3a5c")
+        else:
+            self.configure(border_color="#333333", fg_color="#2b2b2b")
 
 
-class WelcomeDialog(QDialog):
-    """Диалог приветствия для выбора среды установки."""
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.selected_profile = EnvironmentProfile.SYSTEM
-        self._profile_cards: dict[EnvironmentProfile, ProfileCard] = {}
+class InstallModeSelector(ctk.CTk):
+    """Окно выбора режима установки."""
+
+    def __init__(self):
+        super().__init__()
+
+        self.title("qFrey-Tuner - Setup")
+        self.geometry("600x500")
+        self.resizable(False, False)
+
+        self.selected_profile: Optional[EnvironmentProfile] = None
+        self.completed = False
+        self.cards = {}
+
         self._setup_ui()
-    
+
+        # Default selection
+        self._select_profile_by_enum(EnvironmentProfile.SYSTEM)
+
     def _setup_ui(self):
-        self.setWindowTitle("qBittorrent Optimizer")
-        self.setFixedSize(520, 420)
-        self.setStyleSheet("""
-            QDialog {
-                background: #1e1e1e;
-            }
-        """)
-        
-        layout = QVBoxLayout(self)
-        layout.setSpacing(16)
-        layout.setContentsMargins(24, 24, 24, 24)
-        
-        # Заголовок
-        title = QLabel("🚀 Добро пожаловать!")
-        title.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("color: #e0e0e0;")
-        layout.addWidget(title)
-        
-        # Подзаголовок
-        subtitle = QLabel("Где установлен ваш qBittorrent?")
-        subtitle.setFont(QFont("Segoe UI", 12))
-        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle.setStyleSheet("color: #aaa;")
-        layout.addWidget(subtitle)
-        
-        layout.addSpacing(10)
-        
-        # Карточки профилей
-        cards_layout = QGridLayout()
-        cards_layout.setSpacing(12)
-        cards_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
+        # Header
+        self.header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.header_frame.pack(pady=20)
+
+        ctk.CTkLabel(self.header_frame, text="🚀 Welcome to qFrey-Tuner", font=("Segoe UI", 20, "bold")).pack()
+        ctk.CTkLabel(self.header_frame, text="Select your installation type", font=("Segoe UI", 14), text_color="#aaaaaa").pack()
+
+        # Grid for cards
+        self.grid_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.grid_frame.pack(pady=10, padx=20, fill="both", expand=True)
+
+        # Configure grid 3x2
+        self.grid_frame.grid_columnconfigure((0, 1, 2), weight=1)
+        self.grid_frame.grid_rowconfigure((0, 1), weight=1)
+
         profiles = list(EnvironmentProfile)
-        positions = [(0, 0), (0, 1), (0, 2), (1, 0), (1, 1)]
-        
+        positions = [(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2)]
+
         for i, profile in enumerate(profiles):
-            card = ProfileCard(profile, self)
-            self._profile_cards[profile] = card
+            card = ProfileCard(self.grid_frame, profile, self._on_card_click)
+            self.cards[profile] = card
             row, col = positions[i]
-            cards_layout.addWidget(card, row, col)
-        
-        layout.addLayout(cards_layout)
-        
-        # Устанавливаем Desktop по умолчанию
-        self._profile_cards[EnvironmentProfile.SYSTEM].set_selected(True)
-        
-        # Описание выбранного профиля
-        self.description_label = QLabel(PROFILES_DATA[EnvironmentProfile.SYSTEM]["description"])
-        self.description_label.setFont(QFont("Segoe UI", 10))
-        self.description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.description_label.setStyleSheet("color: #888; padding: 10px;")
-        self.description_label.setWordWrap(True)
-        layout.addWidget(self.description_label)
-        
-        layout.addStretch()
-        
-        # Кнопки
-        buttons_layout = QHBoxLayout()
-        buttons_layout.setSpacing(12)
-        
-        self.continue_btn = QPushButton("Продолжить")
-        self.continue_btn.setMinimumHeight(45)
-        self.continue_btn.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-        self.continue_btn.clicked.connect(self.accept)
-        self.continue_btn.setStyleSheet("""
-            QPushButton {
-                background: #0d6efd;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 10px 30px;
-            }
-            QPushButton:hover {
-                background: #0b5ed7;
-            }
-        """)
-        buttons_layout.addWidget(self.continue_btn)
-        
-        layout.addLayout(buttons_layout)
-    
-    def _on_profile_selected(self, profile: EnvironmentProfile):
-        """Обработка выбора профиля."""
-        # Сбрасываем все карточки
-        for card in self._profile_cards.values():
-            card.set_selected(False)
-        
-        # Выбираем новую
-        self._profile_cards[profile].set_selected(True)
+            card.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
+
+        # Description
+        self.desc_label = ctk.CTkLabel(self, text="", font=("Segoe UI", 12), text_color="#cccccc", wraplength=500)
+        self.desc_label.pack(pady=10)
+
+        # Continue Button
+        self.btn = ctk.CTkButton(self, text="Continue", font=("Segoe UI", 14, "bold"), height=40, width=200, command=self.finish)
+        self.btn.pack(pady=20)
+
+    def _on_card_click(self, clicked_card):
+        self._select_profile_by_enum(clicked_card.profile)
+
+    def _select_profile_by_enum(self, profile):
+        for p, card in self.cards.items():
+            card.set_selected(p == profile)
+
         self.selected_profile = profile
-        
-        # Обновляем описание
-        self.description_label.setText(PROFILES_DATA[profile]["description"])
-    
-    def get_selected_profile(self) -> EnvironmentProfile:
-        """Получить выбранный профиль."""
-        return self.selected_profile
+        self.desc_label.configure(text=PROFILES_DATA[profile]["description"])
+
+    def finish(self):
+        self.completed = True
+        self.destroy()
+        # main loop exits, selected_profile remains available

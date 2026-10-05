@@ -40,6 +40,7 @@ session.json
 profile/
 *.lnk
 Info/
+changelogs/
 
 # AI & Tool Specifics
 .agent/
@@ -54,3 +55,12 @@ Info/
 .env*
 auth.json
 api_key*
+work/
+state/
+outputs/
+
+# Local UI validation artifacts
+.test-deps/
+.ux-tests-*/
+.ux_*.py
+.build-deps/

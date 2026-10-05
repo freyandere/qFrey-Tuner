@@ -51,8 +51,8 @@ def calculate_optimal_settings(
     # CONNECTION LIMITS
     # ═══════════════════════════════════════════════════════════════════════════
     
-    upload_speed_kbps = int(network.upload_speed_mbps * 1000 / 8)
-    global_upload_limit = int(upload_speed_kbps * 0.8)
+    # Internet Mbps is decimal; the model's legacy *_kbps fields hold KiB/s.
+    global_upload_limit = int(network.upload_speed_mbps * 1_000_000 / 8 * 0.8 / 1024)
     explanations["upload_limit"] = (
         "80% от скорости отдачи. Оставляет 20% для ACK-пакетов TCP."
     )

@@ -131,48 +131,60 @@ class HardwareDetector:
         return info
 
     @staticmethod
-    def get_main_disk_type() -> str:
-        """Определить тип основного накопителя (HDD, SSD, NVMe)."""
+    def get_main_disk_type(path=None) -> str:
+        """Resolve the selected download volume, never pick the first physical disk."""
+        import json
+        import subprocess
+        drive = Path(path or os.getenv("SystemDrive", "C:")).drive.rstrip(":").upper()
+        if len(drive) != 1 or not drive.isalpha():
+            return "Unknown"
+        # Query the selected volume without admin-only Storage cmdlets.
         try:
-            if win32com:
-                wmi = win32com.client.GetObject("winmgmts:")
-                system_drive = os.getenv("SystemDrive", "C:")
-                
-                # Check MSFT_PhysicalDisk first as it is more reliable for MediaType
+            from ctypes import wintypes
+            kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+            kernel.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+            kernel.CreateFileW.restype = wintypes.HANDLE
+            kernel.DeviceIoControl.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+            kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+            handle = kernel.CreateFileW("\\\\.\\" + drive + ":", 0, 3, None, 3, 0, None)
+            if handle != ctypes.c_void_p(-1).value:
                 try:
-                    storage_wmi = win32com.client.GetObject("winmgmts:\\\\.\\root\\Microsoft\\Windows\\Storage")
-                    phys_disks = storage_wmi.ExecQuery("SELECT DeviceID, Model, MediaType, Bustype FROM MSFT_PhysicalDisk")
-                    for d in phys_disks:
-                        # BusType 17 is NVMe
-                        if getattr(d, 'BusType', 0) == 17 or "NVME" in d.Model.upper():
-                            return "NVMe"
-                        if d.MediaType == 4: # SSD
-                            return "SSD"
-                except Exception:
-                    pass
-
-                # Fallback to Win32_DiskDrive mapping
-                partitions = wmi.ExecQuery("SELECT * FROM Win32_LogicalDiskToPartition")
-                for p in partitions:
-                    if system_drive in p.Dependent:
-                        part_id = p.Antecedent.split('"')[1]
-                        drives = wmi.ExecQuery("SELECT * FROM Win32_DiskDriveToDiskPartition")
-                        for d in drives:
-                            if part_id in d.Dependent:
-                                drive_id = d.Antecedent.split('"')[1]
-                                escaped_id = drive_id.replace('\\', '\\\\')
-                                disk = wmi.ExecQuery(f"SELECT Model, InterfaceType FROM Win32_DiskDrive WHERE DeviceID = '{escaped_id}'")[0]
-                                model = disk.Model.upper()
-                                interface = disk.InterfaceType.upper()
-                                
-                                if "NVME" in model or "NVME" in interface:
-                                    return "NVMe"
-                                if "SSD" in model:
-                                    return "SSD"
-        except Exception:
+                    def query_property(property_id):
+                        query = (wintypes.DWORD * 3)(property_id, 0, 0)
+                        output = ctypes.create_string_buffer(4096)
+                        returned = wintypes.DWORD()
+                        if not kernel.DeviceIoControl(handle, 0x2D1400, query, 12, output, 4096, ctypes.byref(returned), None):
+                            return b""
+                        return output.raw[:returned.value]
+                    descriptor = query_property(0)
+                    if len(descriptor) >= 32 and int.from_bytes(descriptor[28:32], "little") == 17:
+                        return "NVMe"
+                    penalty = query_property(7)
+                    if len(penalty) >= 9:
+                        return "HDD" if penalty[8] else "SSD"
+                finally:
+                    kernel.CloseHandle(handle)
+        except (AttributeError, OSError):
             pass
-            
-        return "HDD"
+        script = (
+            "$ErrorActionPreference='Stop'; "
+            f"$disk=Get-Partition -DriveLetter '{drive}' | Get-Disk; "
+            "$physical=Get-PhysicalDisk | Where-Object { [string]$_.DeviceId -eq [string]$disk.Number }; "
+            "[pscustomobject]@{Bus=[string]$disk.BusType;Media=[string]$physical.MediaType} | ConvertTo-Json -Compress"
+        )
+        try:
+            result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+                capture_output=True, text=True, timeout=12, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), check=True)
+            data = json.loads(result.stdout)
+            if data["Bus"].lower() == "nvme":
+                return "NVMe"
+            if data["Media"].lower() == "ssd":
+                return "SSD"
+            if data["Media"].lower() == "hdd":
+                return "HDD"
+        except (OSError, ValueError, subprocess.SubprocessError, KeyError):
+            pass
+        return "Unknown"
 
 if __name__ == "__main__":
     detector = HardwareDetector()

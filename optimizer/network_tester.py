@@ -28,7 +28,8 @@ class NetworkTester:
         for server in NetworkTester.SERVERS:
             try:
                 start = time.time()
-                NetworkTester._session.head(server["url"], timeout=2)
+                response = NetworkTester._session.head(server["url"], timeout=2)
+                response.raise_for_status()
                 latency = time.time() - start
                 if latency < min_latency:
                     min_latency = latency
@@ -45,12 +46,15 @@ class NetworkTester:
             test_url = f"{url}{sep}bytes={size}&cb={time.time()}"
             headers = {"Cache-Control": "no-cache", "Pragma": "no-cache"}
             
-            r = NetworkTester._session.get(test_url, timeout=15, stream=True, headers=headers)
-            downloaded = 0
-            for chunk in r.iter_content(chunk_size=512*1024):
-                if chunk:
-                    downloaded += len(chunk)
-            return downloaded
+            with NetworkTester._session.get(test_url, timeout=15, stream=True, headers=headers) as r:
+                r.raise_for_status()
+                downloaded = 0
+                for chunk in r.iter_content(chunk_size=512*1024):
+                    if chunk:
+                        downloaded += len(chunk)
+                    if downloaded >= size:
+                        return size
+                return downloaded
         except Exception:
             return 0
 
@@ -70,7 +74,7 @@ class NetworkTester:
             
         duration = time.time() - start_time
         if duration > 0.1 and total_bytes > 0:
-            mbps = (total_bytes * 8 / duration) / (1024 * 1024)
+            mbps = (total_bytes * 8 / duration) / 1_000_000
             # Если тест прошел слишком быстро на одном сервере, результат может быть неточным,
             # но мы хотя бы покажем число, а не ошибку.
             return round(mbps, 1), server["name"]
@@ -110,7 +114,7 @@ class NetworkTester:
             
         duration = time.time() - start_time
         if duration > 0.1 and total_bytes > 0:
-            mbps = (total_bytes * 8 / duration) / (1024 * 1024)
+            mbps = (total_bytes * 8 / duration) / 1_000_000
             return round(mbps, 1)
         return 0.0
 
