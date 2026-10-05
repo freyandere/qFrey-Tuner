@@ -57,3 +57,40 @@ def test_profile_port_hint(tmp_path):
     manager = ConfigManager()
     manager.config_path = path
     assert manager.webui_hint() == {"url": "http://127.0.0.1:9560", "username": "admin", "enabled": True}
+
+
+@pytest.mark.parametrize('version,api,libtorrent', [
+    ('v4.6.0', '2.8.0', '1.2.19'), ('v4.6.7', '2.11.0', '2.0.11'),
+    ('v5.0.0', '2.11.0', '2.0.11'), ('v5.1.0', '2.11.0', '2.0.11'),
+    ('v5.2.3', '2.15.1', '1.2.20'),
+])
+def test_reviewed_versions_read_live_schema_before_connecting(monkeypatch, version, api, libtorrent):
+    client = QBittorrentClient()
+    client.request = Mock(side_effect=[response(version), response(api),
+        response({'libtorrent': libtorrent}), response({'max_connec': 500})])
+    client.connect()
+    assert client.connected
+    assert (client.version, client.api_version, client.libtorrent) == (version, api, libtorrent)
+    assert client.request.call_args.args == ('GET', 'app/preferences')
+
+
+@pytest.mark.parametrize('version,api,libtorrent', [
+    ('v4.5.5', '2.8.0', '1.2.19'), ('v4.7.0', '2.11.0', '2.0.11'),
+    ('v5.3.0', '2.15.1', '2.0.11'), ('v6.0.0', '2.15.1', '2.0.11'),
+    ('v5.2.0rc1', '2.15.1', '2.0.11'), ('unknown', '2.11.0', '2.0.11'),
+    ('v5.1.0', '2.7.0', '2.0.11'), ('v5.1.0', '3.0.0', '2.0.11'),
+    ('v5.1.0', '2.11.0rc1', '2.0.11'), ('v5.1.0', 'bad', '2.0.11'),
+    ('v5.1.0', '2.11.0', '3.0.0'), ('v5.1.0', '2.11.0', '2.bad'),
+    ('v5.1.0', '2.11.0', '1.'), ('v5.1.0', '2.11.0', '2.0.11.dev1'),
+    ('v5.1.0', '2.11.0', '2'), ('v5.1.0', '2.11.0', None),
+    ('v5.1.0', '2.11.0', 2),
+])
+def test_unknown_versions_never_unlock_or_write(monkeypatch, version, api, libtorrent):
+    client = QBittorrentClient()
+    client.connected = True  # Failed reconnect must clear an earlier success.
+    client.request = Mock(side_effect=[response(version), response(api), response({'libtorrent': libtorrent})])
+    with pytest.raises(ClientError):
+        client.connect()
+    assert not client.connected
+    assert client.request.call_count == 3
+    assert all(call.args[0] == 'GET' for call in client.request.call_args_list)

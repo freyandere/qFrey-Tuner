@@ -4,6 +4,8 @@
 
 All settings and statistics use one authenticated `QBittorrentClient` endpoint. The API reports application/API/libtorrent versions. A known API key allowlist plus the live preference response determines compatibility; the application never infers effective preferences from a guessed INI schema.
 
+The runtime gate accepts stable qBittorrent 4.6.x/5.0–5.2.x, stable API v2.8+ within v2, and parsed stable libtorrent 1.x/2.x. Future minor branches require an explicit upstream review. See [version compatibility](version-compatibility.md) for permanent source references, CI checks and the extension procedure.
+
 Source references:
 
 - [Official Web API documentation](https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-(qBittorrent-5.0))
@@ -11,6 +13,8 @@ Source references:
 - [Session settings implementation](https://github.com/qbittorrent/qBittorrent/blob/master/src/base/bittorrent/sessionimpl.cpp)
 
 API speed-limit values are bytes/second, as implemented by the API controller and session accessors. Send-buffer watermarks use KiB. Benchmark throughput is reported in MiB/s. Documentation examples and prose have historically been inconsistent about speed-limit units; implementation and readback are the authority here.
+
+OS caching uses integer `disk_io_read_mode` and `disk_io_write_mode` (0 disabled, 1 enabled), on libtorrent 1 and 2. The old `enable_os_cache` example in the wiki does not match supported 4.6/5.x controllers. Legacy disk cache and coalescing are skipped for libtorrent 2. See the [version-pinned schema audit](qbittorrent-schema-audit-ru.md) for every applied key and official sources.
 
 Internet speeds use decimal Mbps. The calculator converts the 80% upload recommendation to KiB/s before the API adapter converts to bytes/s. For 100 Mbps upload, the result is 9,765 KiB/s (9,999,360 bytes/s), without the previous decimal/binary overstatement.
 

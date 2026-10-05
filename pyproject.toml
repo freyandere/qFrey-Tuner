@@ -27,3 +27,7 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["optimizer", "ui"]
 
+[tool.pytest.ini_options]
+addopts = "--basetemp=.cache/tests"
+cache_dir = ".cache/pytest"
+

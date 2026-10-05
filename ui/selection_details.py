@@ -4,8 +4,8 @@ from optimizer.models import EnvironmentProfile, ConnectionType
 PROFILE_DETAILS = {
     EnvironmentProfile.SYSTEM: ('Installed on this computer', 'Finds the standard user profile as well as nearby profiles. Uses normal desktop tuning rules based on your drive, memory and speeds.'),
     EnvironmentProfile.PORTABLE: ('Portable folder on Windows', 'Searches beside qBittorrent and its portable profile; skips the standard user config. Tuning calculations are the same as System desktop. This choice does not move your files.'),
-    EnvironmentProfile.TRUENAS: ('Server with ZFS storage', 'Skips local config discovery. Recommends no early file-space reservation. Legacy cache rules favour ZFS/system caching; those cache controls are skipped on libtorrent 2. Enter the server hardware yourself.'),
-    EnvironmentProfile.NAS: ('Network storage server', 'Skips local config discovery. Recommends early file-space reservation; legacy cache rules use a 512 MB buffer without system caching. Those cache controls are skipped on libtorrent 2. Enter the NAS hardware yourself.'),
+    EnvironmentProfile.TRUENAS: ('Server with ZFS storage', 'Skips local config discovery. Recommends no early file-space reservation and system caching for disk reads/writes. The legacy disk-cache size is skipped on libtorrent 2. Enter the server hardware yourself.'),
+    EnvironmentProfile.NAS: ('Network storage server', 'Skips local config discovery. Recommends early file-space reservation and disabled system caching for disk reads/writes. The legacy 512 MiB disk buffer is skipped on libtorrent 2. Enter the NAS hardware yourself.'),
     EnvironmentProfile.DOCKER: ('Container using a VPN', 'Skips local config discovery. Recommends TCP, smaller outgoing buffers and VPN adapter binding (defaults to tun0 if no adapter was entered). The adapter must exist on the qBittorrent host. This does not create a VPN.'),
     EnvironmentProfile.SEEDBOX: ('Dedicated torrent server', 'Skips local config discovery. Recommends higher connection and upload allowances, larger outgoing buffers and TCP. Private-tracker rules can override the allowances. Enter the server hardware and speeds yourself.'),
 }

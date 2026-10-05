@@ -27,7 +27,8 @@ LABELS = {
     'listen_port': ('Incoming connection port', 'The port peers use to connect to you.'),
     'random_port': ('Change port at startup', 'Whether qBittorrent chooses a new port on launch.'),
     'disk_cache': ('Download memory buffer', 'Hold data in memory before writing it to disk.'),
-    'enable_os_cache': ('Use system disk caching', 'Allow the operating system to buffer disk data.'),
+    'disk_io_read_mode': ('System cache for disk reads', 'Control operating-system caching when reading torrent data.'),
+    'disk_io_write_mode': ('System cache for disk writes', 'Control operating-system caching when writing torrent data.'),
     'enable_coalesce_read_write': ('Combine small disk tasks', 'Group small reads and writes.'),
     'limit_utp_rate': ('Include all traffic in speed limits', 'Apply limits to the alternate torrent transport too.'),
     'send_buffer_watermark': ('Outgoing data buffer', 'Data prepared in advance for peers.'),
@@ -46,7 +47,9 @@ def display(key, value):
     if key == 'bittorrent_protocol':
         return {0: 'Both methods', 1: 'TCP', 2: 'µTP'}.get(value, str(value))
     if key == 'encryption':
-        return {0: 'Prefer encrypted', 1: 'Require encrypted', 2: 'Allow unencrypted'}.get(value, str(value))
+        return {0: 'Prefer encrypted', 1: 'Require encrypted', 2: 'Disable encryption'}.get(value, str(value))
+    if key in ('disk_io_read_mode', 'disk_io_write_mode'):
+        return {0: 'OS cache disabled', 1: 'OS cache enabled', 2: 'Write-through'}.get(value, str(value))
     return str(value)
 
 

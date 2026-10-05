@@ -1,15 +1,19 @@
 @echo off
 setlocal
 cd /d "%~dp0"
+set "PYTHONPYCACHEPREFIX=%CD%\.cache\pycache"
+set "UV_CACHE_DIR=%CD%\.cache\uv"
+set "UV_PROJECT_ENVIRONMENT=%CD%\.cache\venv"
+set "PATH=%CD%\.cache\tools\uv\Scripts;%PATH%"
 where uv >nul 2>nul
 if errorlevel 1 (
     echo Building requires uv. Install it from https://docs.astral.sh/uv/getting-started/installation/
     echo Or use Python manually: python -m pip install ".[dev]"
-    echo Then: python -m pytest tests/ and pyinstaller qFrey-Tuner.spec
+    echo Then: python -m pytest tests/ and python scripts/build.py
     pause
     exit /b 1
 )
-uv sync --extra dev
+uv sync --locked --extra dev
 if errorlevel 1 goto failed
 uv run --extra dev python main.py --check
 if errorlevel 1 goto failed
@@ -17,11 +21,9 @@ uv run --extra dev python -m pytest tests/ -q -p no:cacheprovider
 if errorlevel 1 goto failed
 uv run --extra dev python tests/verify_startup.py
 if errorlevel 1 goto failed
-uv run --extra dev pyinstaller qFrey-Tuner.spec --noconfirm --clean
+uv run --locked --extra dev python scripts/build.py
 if errorlevel 1 goto failed
-uv run --extra dev python -c "import shutil,tomllib; from pathlib import Path; version=tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version']; Path('outputs').mkdir(exist_ok=True); shutil.copy2(f'dist/qFrey-Tuner_v{version}.exe', 'outputs/qFrey-Tuner.exe')"
-if errorlevel 1 goto failed
-echo Build completed: outputs\qFrey-Tuner.exe. Versioned executable: dist/.
+echo Build completed: artifacts\release\qFrey-Tuner.exe
 exit /b 0
 :failed
 echo Build stopped because a prerequisite, test or packaging check failed.

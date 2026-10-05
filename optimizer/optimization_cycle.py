@@ -63,6 +63,9 @@ def recommended_preferences(settings, current, libtorrent):
         "max_active_torrents": settings.max_active_torrents,
         "preallocate_all": settings.pre_allocate_disk,
         "async_io_threads": settings.async_io_threads,
+        # qBittorrent 4.6/5.x session.h: DisableOSCache=0, EnableOSCache=1.
+        "disk_io_read_mode": int(settings.enable_os_cache),
+        "disk_io_write_mode": int(settings.enable_os_cache),
         "bittorrent_protocol": {ProtocolMode.UTP_TCP: 0, ProtocolMode.TCP_ONLY: 1, ProtocolMode.UTP_ONLY: 2}[settings.protocol_mode],
         "send_buffer_watermark": settings.send_buffer_watermark_kb,
         "send_buffer_low_watermark": settings.send_buffer_low_watermark_kb,
@@ -77,10 +80,10 @@ def recommended_preferences(settings, current, libtorrent):
     }
     omitted = ["Super seeding is per torrent; not changed by this application."]
     if libtorrent.startswith("1."):
-        candidates.update(disk_cache=settings.disk_cache_mb, enable_os_cache=settings.enable_os_cache,
+        candidates.update(disk_cache=settings.disk_cache_mb,
                           enable_coalesce_read_write=settings.coalesce_reads_writes)
     else:
-        omitted.append("Legacy disk cache, OS cache and coalescing rules skipped for libtorrent 2.")
+        omitted.append("Legacy disk cache and coalescing rules skipped for libtorrent 2; OS cache uses disk I/O modes.")
     if settings.network_interface:
         candidates["current_network_interface"] = settings.network_interface
     else:
@@ -243,7 +246,7 @@ class OptimizationCycle:
                 "max_active_torrents", "preallocate_all", "async_io_threads", "bittorrent_protocol",
                 "send_buffer_watermark", "send_buffer_low_watermark", "send_buffer_watermark_factor",
                 "socket_backlog_size", "connection_speed", "encryption", "anonymous_mode", "dht", "pex", "lsd",
-                "current_network_interface", "listen_port", "random_port", "disk_cache", "enable_os_cache",
+                "current_network_interface", "listen_port", "random_port", "disk_cache", "disk_io_read_mode", "disk_io_write_mode",
                 "enable_coalesce_read_write", "limit_utp_rate", "alt_up_limit", "alt_dl_limit",
                 "scheduler_enabled", "upload_slots_behavior"}
         return {k: v for k, v in prefs.items() if k in keys}

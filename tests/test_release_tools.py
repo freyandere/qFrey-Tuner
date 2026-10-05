@@ -18,3 +18,26 @@ version = "8.0.0"
     updated = path.read_text(encoding='utf-8')
     assert updated == source.replace('version = "0.3.3"', 'version = "0.3.4"')
     assert tomllib.loads(updated)['tool']['example']['version'] == '8.0.0'
+
+
+def test_publish_preserves_previous_executable_and_manifest(tmp_path, monkeypatch):
+    import json
+    import hashlib
+    from scripts import build
+    release = tmp_path / 'release'
+    archive = tmp_path / 'archive'
+    release.mkdir()
+    (release / 'qFrey-Tuner.exe').write_bytes(b'previous exe')
+    (release / 'build.json').write_text('{"version": "old"}')
+    candidate = tmp_path / 'candidate.exe'
+    candidate.write_bytes(b'new exe')
+    monkeypatch.setattr(build, 'RELEASE', release)
+    monkeypatch.setattr(build, 'ARCHIVE', archive)
+    target = build.publish(candidate, '0.3.4')
+    assert target.read_bytes() == b'new exe'
+    saved = next(archive.iterdir())
+    assert (saved / target.name).read_bytes() == b'previous exe'
+    assert json.loads((saved / 'build.json').read_text())['version'] == 'old'
+    manifest = json.loads((release / 'build.json').read_text())
+    assert manifest['version'] == '0.3.4'
+    assert manifest['sha256'] == hashlib.sha256(b'new exe').hexdigest()

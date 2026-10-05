@@ -1,6 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
 import tomllib
+from pathlib import Path
+from PyInstaller.config import CONF
+
+root = Path(SPECPATH).resolve()
+if Path(CONF['distpath']).resolve() != root / '.cache/staging' or Path(CONF['workpath']).resolve() != root / '.cache/pyinstaller/qFrey-Tuner':
+    raise SystemExit('Build with python scripts/build.py (or build.bat); output paths are fixed by the build contract.')
 
 # Load version from pyproject.toml
 with open('pyproject.toml', 'rb') as f:
@@ -34,7 +40,7 @@ a = Analysis(
 )
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-exe_name = f'qFrey-Tuner_v{version}'
+exe_name = 'qFrey-Tuner'
 
 exe = EXE(
     pyz,

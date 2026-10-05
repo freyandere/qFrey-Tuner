@@ -3,13 +3,13 @@ setlocal
 chcp 65001 >nul
 title qFrey-Tuner
 cd /d "%~dp0"
+set "PYTHONPYCACHEPREFIX=%CD%\.cache\pycache"
+set "UV_CACHE_DIR=%CD%\.cache\uv"
+set "UV_PROJECT_ENVIRONMENT=%CD%\.cache\venv"
+set "PATH=%CD%\.cache\tools\uv\Scripts;%PATH%"
 
-if exist "outputs\qFrey-Tuner.exe" (
-    start "" "outputs\qFrey-Tuner.exe"
-    exit /b 0
-)
-if exist "qFrey-Tuner.exe" (
-    start "" "qFrey-Tuner.exe"
+if exist "artifacts\release\qFrey-Tuner.exe" (
+    start "" "artifacts\release\qFrey-Tuner.exe"
     exit /b 0
 )
 

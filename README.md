@@ -1,6 +1,6 @@
 # qFrey-Tuner
 
-The launcher uses `outputs/qFrey-Tuner.exe`, updated by `build.bat` from the exact version in `pyproject.toml`. Versioned copies are kept in `dist/` for sharing. Internet tests and torrent measurements run through one background-job queue and cannot overlap.
+The launcher uses `artifacts/release/qFrey-Tuner.exe`. Local builds and CI use `scripts/build.py`; intermediate files stay in `.cache/`. Previous executables are preserved in `artifacts/archive/`. See the [build layout design](docs/build-layout-design.md) for paths, retention and cleanup rules. Internet tests and torrent measurements cannot overlap.
 
 qFrey-Tuner calculates rule-based qBittorrent recommendations and runs a verified before/after optimization cycle using CustomTkinter.
 
@@ -20,7 +20,7 @@ Download a Windows executable from [Releases](https://github.com/freyandere/qFre
 
 Run from a writable folder. Experiment files are stored in `state/` beside the source application/executable; if that location cannot be written, the application uses `%LOCALAPPDATA%/qFrey-Tuner` on Windows or `~/.local/share/qFrey-Tuner` elsewhere.
 
-A locally built application can be placed at `outputs/qFrey-Tuner.exe`; `Run.bat` launches that standalone build before checking source runtimes. When changing source code, rebuild that executable before using the launcher, or run `python main.py` directly to test the source.
+A locally built application is placed at `artifacts/release/qFrey-Tuner.exe`; `Run.bat` launches it before checking source runtimes. Use `build.bat` to rebuild, or run `python main.py` directly to test the source. `artifacts/release/build.json` records the version and EXE checksum. Previous builds are archived before replacement.
 
 
 ### Web UI connection and diagnostic logs
@@ -29,7 +29,7 @@ Use the port shown in qBittorrent **Options > Web UI**, which may differ from th
 
 The tuner first checks existing access before attempting password login. API keys use Bearer authentication. Blank credentials do not trigger repeated login attempts. Profile discovery can become more complete after qBittorrent starts, because its executable and `--profile` arguments become available.
 
-Use **Open diagnostic log** on Setup. Rotating logs are stored at `state/logs/qfrey-tuner.log` beside the executable (for the local build: `outputs/state/logs/qfrey-tuner.log`), with the same fallback directory as experiments. They record startup, operation outcomes, API paths/status codes/timing, and validated versions. Passwords, API keys, cookies, request headers and preference payloads are not logged or saved. Four log files are retained, up to 2 MB each.
+Use **Open diagnostic log** on Setup. Rotating logs are stored at `state/logs/qfrey-tuner.log` beside the executable (for the local build: `artifacts/release/state/logs/qfrey-tuner.log`), with the same fallback directory as experiments. They record startup, operation outcomes, API paths/status codes/timing, and validated versions. Passwords, API keys, cookies, request headers and preference payloads are not logged or saved. Four log files are retained, up to 2 MB each.
 
 ### From source
 
@@ -77,14 +77,16 @@ The app can start a manually selected local executable. Graceful shutdown/restar
 
 ## Compatibility and limitations
 
-- Accepted targets: qBittorrent 4.6 through 5.x with Web API v2.8+ in the v2 family and a recognized libtorrent 1.x/2.x build. This range is guarded by live capabilities; it is not a claim that every release has been tested on a real client.
+- Accepted targets: stable qBittorrent 4.6.x and 5.0–5.2.x with stable Web API v2.8+ in the v2 family and a parsed stable libtorrent 1.x/2.x build. Future minor branches, prereleases and malformed versions are rejected. Every accepted target still needs live schema checks; this is not a claim that every release has been tested on a real client.
 - Only known preference keys exposed by the connected target with the expected type are proposed. Missing required privacy/connection settings block the plan. Unsupported optional settings are listed explicitly.
-- Legacy disk-cache, OS-cache, and coalescing recommendations are excluded for libtorrent 2. Super seeding is per torrent and remains manual.
+- Legacy disk-cache and coalescing recommendations are excluded for libtorrent 2. OS-cache controls use `disk_io_read_mode` / `disk_io_write_mode` on both engine branches. Super seeding is per torrent and remains manual.
 - VPN interfaces are checked against the target host's interface list. Existing bindings are preserved when no new binding is requested.
 - Recommendations remain heuristics. Readback establishes effective preference values, not improved performance or a tested VPN kill switch.
 - The benchmark observes the user's active torrents. It does not add/download a hard-coded test torrent. Peer availability, disk cache, and external traffic can change; the comparison does not prove causation.
 - Process discovery can be restricted by OS permissions. Lifecycle actions fail clearly when ownership cannot be established.
 - Offline schema writes are deliberately blocked; there is no legacy guessed-key writer.
+
+Official sources, the version gate, reproducible test commands and the procedure for extending support are recorded in [version compatibility](docs/version-compatibility.md). The [schema audit](docs/qbittorrent-schema-audit-ru.md) maps every applied API field to its configuration key. CI runs regression tests and `scripts/check_qbittorrent_schema.py` against the reviewed upstream tags before release builds.
 
 ## Development and verification
 
@@ -92,7 +94,7 @@ The app can start a manually selected local executable. Graceful shutdown/restar
 python -m pip install ".[dev]"
 python -m pytest tests/ -q -p no:cacheprovider
 python tests/verify_startup.py
-pyinstaller qFrey-Tuner.spec --clean
+python scripts/build.py
 ```
 
 GUI smoke tests require a graphical session and working Tcl/Tk. Tests exercise API transport using a local HTTP fixture, cycle ordering, compatibility, stale-input guards, durable backups, readback failures, workload mismatch, rollback, process ownership, and setup gating. They do not change a real qBittorrent installation.

@@ -26,6 +26,7 @@ class FakeClient:
         self.prefs = {"max_connec": 500, "max_connec_per_torrent": 100, "up_limit": 0, "dl_limit": 0,
                       "dht": True, "pex": True, "lsd": True, "encryption": 0,
                       "anonymous_mode": False, "async_io_threads": 10, "current_network_interface": "",
+                      "disk_io_read_mode": 0, "disk_io_write_mode": 2,
                       "web_ui_password": "must-not-be-saved"}
         self.reject = False
         self.download = 1024**2
@@ -70,6 +71,8 @@ def test_complete_cycle_readback_comparison_rollback(cycle):
     cycle.rollback()
     assert cycle.client.prefs["max_connec"] == 500
     assert not cycle.verified
+    assert cycle.client.prefs['disk_io_read_mode'] == 0
+    assert cycle.client.prefs['disk_io_write_mode'] == 2
 
 
 def test_order_and_stale_input_guards(cycle):
@@ -136,6 +139,39 @@ def test_unsupported_required_key_and_libtorrent2_exclusions(cycle):
     del prefs["encryption"]
     with pytest.raises(ClientError, match="encryption"):
         recommended_preferences(target, prefs, "2.0.11")
+
+
+@pytest.mark.parametrize('libtorrent', ['1.2.19', '2.0.11'])
+@pytest.mark.parametrize('cache_enabled', [False, True])
+def test_official_disk_modes_units_and_enum_contract(cycle, libtorrent, cache_enabled):
+    from optimizer.models import ProtocolMode, EncryptionMode
+    target = settings()
+    target.enable_os_cache = cache_enabled
+    target.listening_port = 'Random (55000)'
+    prefs = cycle.client.preferences()
+    prefs.update(disk_cache=512, enable_coalesce_read_write=False,
+                 send_buffer_watermark=500, send_buffer_low_watermark=10,
+                 send_buffer_watermark_factor=50, bittorrent_protocol=0,
+                 listen_port=6881, random_port=False)
+    for protocol, encryption, number in zip(
+            [ProtocolMode.UTP_TCP, ProtocolMode.TCP_ONLY, ProtocolMode.UTP_ONLY],
+            [EncryptionMode.PREFER, EncryptionMode.REQUIRE, EncryptionMode.DISABLED], [0, 1, 2]):
+        target.protocol_mode, target.encryption_mode = protocol, encryption
+        requested, _ = recommended_preferences(target, prefs, libtorrent)
+        assert requested['disk_io_read_mode'] == requested['disk_io_write_mode'] == int(cache_enabled)
+        assert type(requested['disk_io_read_mode']) is int
+        assert 'enable_os_cache' not in requested
+        assert requested['up_limit'] == 9_999_360  # API bytes/s; stored speed is 9765 KiB/s.
+        assert requested['send_buffer_watermark'] == 500  # API KiB, not bytes.
+        assert requested['send_buffer_low_watermark'] == 16
+        assert requested['bittorrent_protocol'] == requested['encryption'] == number
+        assert requested['listen_port'] == 55000 and requested['random_port'] is False
+        assert ('disk_cache' in requested) == libtorrent.startswith('1.')
+        assert ('enable_coalesce_read_write' in requested) == libtorrent.startswith('1.')
+        assert requested.keys() <= cycle._safe_preferences(requested).keys()
+    from ui.tabs.results_tab import display
+    assert display('disk_io_write_mode', 2) == 'Write-through'
+    assert display('disk_io_read_mode', 0) == 'OS cache disabled'
 
 
 def test_nonexistent_vpn_interface_blocks_preview(cycle):

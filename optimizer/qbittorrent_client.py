@@ -93,11 +93,15 @@ class QBittorrentClient:
         try:
             version = Version(self.version.lstrip("v"))
             api = Version(self.api_version)
-        except InvalidVersion as exc:
-            raise ClientError("Cannot validate the reported qBittorrent/API version.") from exc
-        if not (Version("4.6") <= version < Version("6") and Version("2.8") <= api < Version("3")):
-            raise ClientError(f"Unsupported version: qBittorrent {self.version}, API {self.api_version}. Supported: 4.6/5.x, API 2.8+ in v2.")
-        if not self.libtorrent.startswith(("1.", "2.")):
+            libtorrent = Version(self.libtorrent)
+        except (InvalidVersion, TypeError) as exc:
+            raise ClientError("Cannot validate the reported qBittorrent/API/libtorrent version.") from exc
+        # Expand only after checking the tagged upstream contract (see docs/version-compatibility.md).
+        reviewed = (Version("4.6") <= version < Version("4.7") or Version("5.0") <= version < Version("5.3"))
+        if not (reviewed and Version("2.8") <= api < Version("3")) or any(
+                v.is_prerelease or v.is_devrelease for v in (version, api, libtorrent)):
+            raise ClientError(f"Unsupported version: qBittorrent {self.version}, API {self.api_version}, libtorrent {self.libtorrent}. Supported: stable qBittorrent 4.6.x/5.0–5.2.x, API 2.8+ in v2. See docs/version-compatibility.md before expanding support.")
+        if len(libtorrent.release) < 2 or libtorrent.major not in (1, 2):
             raise ClientError("Unknown libtorrent version; settings compatibility cannot be established.")
         self.preferences()  # Read permission and live schema must both work.
         self.connected = True
