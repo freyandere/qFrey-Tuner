@@ -1,0 +1,198 @@
+{
+  "ramp": {
+    "input": {
+      "fresh_start": true,
+      "samples": [
+        {
+          "download": 0,
+          "elapsed": 0.0,
+          "errors": 0,
+          "peers": 0,
+          "phase": "warmup",
+          "seeds": 0,
+          "stalled_downloads": 0,
+          "stalled_uploads": 0,
+          "upload": 0
+        },
+        {
+          "download": 10485760,
+          "elapsed": 1.0,
+          "errors": 0,
+          "peers": 1,
+          "phase": "warmup",
+          "seeds": 0,
+          "stalled_downloads": 0,
+          "stalled_uploads": 0,
+          "upload": 0
+        },
+        {
+          "download": 20971520,
+          "elapsed": 2.0,
+          "errors": 0,
+          "peers": 5,
+          "phase": "warmup",
+          "seeds": 3,
+          "stalled_downloads": 0,
+          "stalled_uploads": 0,
+          "upload": 0
+        },
+        {
+          "download": 57671680,
+          "elapsed": 3.0,
+          "errors": 0,
+          "peers": 5,
+          "phase": "warmup",
+          "seeds": 3,
+          "stalled_downloads": 0,
+          "stalled_uploads": 0,
+          "upload": 0
+        },
+        {
+          "download": 73400320,
+          "elapsed": 4.0,
+          "errors": 0,
+          "peers": 5,
+          "phase": "warmup",
+          "seeds": 3,
+          "stalled_downloads": 0,
+          "stalled_uploads": 0,
+          "upload": 0
+        },
+        {
+          "download": 104857600,
+          "elapsed": 5.0,
+          "errors": 0,
+          "peers": 5,
+          "phase": "measurement",
+          "seeds": 3,
+          "stalled_downloads": 0,
+          "stalled_uploads": 0,
+          "upload": 0
+        },
+        {
+          "download": 104857600,
+          "elapsed": 6.0,
+          "errors": 0,
+          "peers": 5,
+          "phase": "measurement",
+          "seeds": 3,
+          "stalled_downloads": 0,
+          "stalled_uploads": 0,
+          "upload": 0
+        },
+        {
+          "download": 104857600,
+          "elapsed": 7.0,
+          "errors": 0,
+          "peers": 5,
+          "phase": "measurement",
+          "seeds": 3,
+          "stalled_downloads": 0,
+          "stalled_uploads": 0,
+          "upload": 0
+        },
+        {
+          "download": 104857600,
+          "elapsed": 8.0,
+          "errors": 0,
+          "peers": 5,
+          "phase": "measurement",
+          "seeds": 3,
+          "stalled_downloads": 0,
+          "stalled_uploads": 0,
+          "upload": 0
+        },
+        {
+          "download": 104857600,
+          "elapsed": 9.0,
+          "errors": 0,
+          "peers": 5,
+          "phase": "measurement",
+          "seeds": 3,
+          "stalled_downloads": 0,
+          "stalled_uploads": 0,
+          "upload": 0
+        },
+        {
+          "download": 104857600,
+          "elapsed": 10.0,
+          "errors": 0,
+          "peers": 5,
+          "phase": "measurement",
+          "seeds": 3,
+          "stalled_downloads": 0,
+          "stalled_uploads": 0,
+          "upload": 0
+        }
+      ],
+      "scope": "test torrent"
+    },
+    "output": {
+      "first_peer_seconds": 1.0,
+      "first_seed_seconds": 2.0,
+      "first_traffic_seconds": 1.0,
+      "fresh_start": true,
+      "peak_connected_peers": 5,
+      "peak_connected_seeds": 3,
+      "reference_download_mib_s": 100.0,
+      "time_to_50_seconds": 3.0,
+      "time_to_90_seconds": 5.0
+    }
+  },
+  "workload": {
+    "100": {
+      "kali_seconds": 1161.77829888,
+      "required_bytes": 1125000000,
+      "required_seconds": 90,
+      "speed_mbps": 100.0,
+      "ubuntu_seconds": 381.01663744,
+      "workload": "ubuntu"
+    },
+    "1000": {
+      "kali_seconds": 116.177829888,
+      "required_bytes": 11250000000,
+      "required_seconds": 90,
+      "speed_mbps": 1000.0,
+      "ubuntu_seconds": 38.101663744,
+      "workload": "kali"
+    },
+    "2500": {
+      "kali_seconds": 46.4711319552,
+      "required_bytes": 28125000000,
+      "required_seconds": 90,
+      "speed_mbps": 2500.0,
+      "ubuntu_seconds": 15.2406654976,
+      "workload": null
+    },
+    "400": {
+      "kali_seconds": 290.44457472,
+      "required_bytes": 4500000000,
+      "required_seconds": 90,
+      "speed_mbps": 400.0,
+      "ubuntu_seconds": 95.25415936,
+      "workload": "ubuntu"
+    },
+    "500": {
+      "kali_seconds": 232.355659776,
+      "required_bytes": 5625000000,
+      "required_seconds": 90,
+      "speed_mbps": 500.0,
+      "ubuntu_seconds": 76.203327488,
+      "workload": "kali"
+    },
+    "legacyRecord": {
+      "bytes": 123,
+      "hash": "f008118f88698f906ec366f52e3b521bfa20d9ea",
+      "host": "http://127.0.0.1:8080",
+      "save_path": "<fixture-download-path>",
+      "source": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-desktop-amd64.iso.torrent",
+      "tag": "qfrey-test-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "workload_id": "ubuntu"
+    },
+    "officialImageBytes": {
+      "kali": 14522228736,
+      "ubuntu": 4762707968
+    },
+    "requiredSeconds": 90
+  }
+}

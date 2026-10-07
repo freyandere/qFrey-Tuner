@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <LocalizationSource Include="../../frontend/src/i18n/**/*.ts;../../frontend/src/components/*Messages.ts;../../scripts/export-i18n.mjs" />
+    <EmbeddedResource Include="../../.cache/generated/locales.json" LogicalName="QFrey.Locales.json" />
+  </ItemGroup>
+  <Target Name="GenerateLocalization" BeforeTargets="PrepareForBuild" Inputs="@(LocalizationSource)" Outputs="../../.cache/generated/locales.json">
+    <Exec Command="node &quot;../../scripts/export-i18n.mjs&quot;" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+</Project>

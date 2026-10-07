@@ -1,0 +1,7 @@
+storeDir: ../.cache/pnpm/store
+cacheDir: ../.cache/pnpm/cache
+stateDir: ../.cache/pnpm/state
+virtualStoreDir: ../.cache/pnpm/virtual-store
+allowBuilds:
+  '@tailwindcss/oxide': true
+  esbuild: true

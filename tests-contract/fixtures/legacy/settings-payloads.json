@@ -1,0 +1,85 @@
+{
+  "1.2.19": {
+    "input": {
+      "libtorrent": "1.2.19",
+      "randomPort": 55000
+    },
+    "omitted": [
+      "Super seeding is per torrent; not changed by this application."
+    ],
+    "payload": {
+      "anonymous_mode": true,
+      "async_io_threads": 32,
+      "bittorrent_protocol": 1,
+      "connection_speed": 100,
+      "current_network_interface": "wg0",
+      "dht": true,
+      "disk_cache": -1,
+      "disk_io_read_mode": 1,
+      "disk_io_write_mode": 1,
+      "dl_limit": 0,
+      "enable_coalesce_read_write": true,
+      "encryption": 1,
+      "limit_utp_rate": true,
+      "listen_port": 55000,
+      "lsd": true,
+      "max_active_downloads": 10,
+      "max_active_torrents": 25,
+      "max_active_uploads": 15,
+      "max_connec": 1000,
+      "max_connec_per_torrent": 250,
+      "max_uploads": 976,
+      "max_uploads_per_torrent": 325,
+      "pex": true,
+      "preallocate_all": true,
+      "queueing_enabled": true,
+      "random_port": false,
+      "send_buffer_low_watermark": 16,
+      "send_buffer_watermark": 500,
+      "send_buffer_watermark_factor": 100,
+      "socket_backlog_size": 30,
+      "up_limit": 9999360
+    }
+  },
+  "2.0.11": {
+    "input": {
+      "libtorrent": "2.0.11",
+      "randomPort": 55000
+    },
+    "omitted": [
+      "Super seeding is per torrent; not changed by this application.",
+      "Legacy disk cache and coalescing rules skipped for libtorrent 2; OS cache uses disk I/O modes."
+    ],
+    "payload": {
+      "anonymous_mode": true,
+      "async_io_threads": 32,
+      "bittorrent_protocol": 1,
+      "connection_speed": 100,
+      "current_network_interface": "wg0",
+      "dht": true,
+      "disk_io_read_mode": 1,
+      "disk_io_write_mode": 1,
+      "dl_limit": 0,
+      "encryption": 1,
+      "limit_utp_rate": true,
+      "listen_port": 55000,
+      "lsd": true,
+      "max_active_downloads": 10,
+      "max_active_torrents": 25,
+      "max_active_uploads": 15,
+      "max_connec": 1000,
+      "max_connec_per_torrent": 250,
+      "max_uploads": 976,
+      "max_uploads_per_torrent": 325,
+      "pex": true,
+      "preallocate_all": true,
+      "queueing_enabled": true,
+      "random_port": false,
+      "send_buffer_low_watermark": 16,
+      "send_buffer_watermark": 500,
+      "send_buffer_watermark_factor": 100,
+      "socket_backlog_size": 30,
+      "up_limit": 9999360
+    }
+  }
+}
