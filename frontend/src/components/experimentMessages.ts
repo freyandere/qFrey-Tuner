@@ -2,7 +2,8 @@ import type { Locale } from '../contracts/protocol';
 
 export const enExperimentMessages = {
   'experiment.title': 'Experiment',
-  'experiment.description': 'Measure an existing workload without changing qBittorrent settings.',
+  'experiment.cycleTitle': 'Measurement cycle',
+  'experiment.description': 'Measure the selected workload without changing qBittorrent settings.',
   'experiment.steps.preparation': 'Preparation',
   'experiment.steps.baseline': 'Baseline',
   'experiment.steps.plan': 'Review plan',
@@ -47,6 +48,7 @@ export const enExperimentMessages = {
   'experiment.rolledBackNewCycle': 'This cycle was rolled back. Its measurements remain in history. A new baseline requires a new plan and cycle; do not reapply this cycle’s plan.',
   'experiment.afterNeedsBaseline': 'A valid baseline is required before an after measurement.',
   'experiment.afterExists': 'A valid after measurement is already recorded for this cycle.',
+  'experiment.recoveryRequired': 'Measurements are blocked until the settings operation is verified or recovery is complete. Review the settings actions below.',
   'experiment.operation.title': 'Current operation',
   'experiment.operation.stage': 'Stage',
   'experiment.operation.stage.warmingUp': 'Warming up',
@@ -71,7 +73,8 @@ export const enExperimentMessages = {
 
 export const ruExperimentMessages = {
   'experiment.title': 'Эксперимент',
-  'experiment.description': 'Измерьте существующую загрузку без изменения настроек qBittorrent.',
+  'experiment.cycleTitle': 'Цикл замеров',
+  'experiment.description': 'Измерьте выбранную загрузку без изменения настроек qBittorrent.',
   'experiment.steps.preparation': 'Подготовка',
   'experiment.steps.baseline': 'Исходный замер',
   'experiment.steps.plan': 'Проверка плана',
@@ -116,6 +119,7 @@ export const ruExperimentMessages = {
   'experiment.rolledBackNewCycle': 'Этот цикл завершён откатом. Замеры сохранены в истории. Для нового исходного замера нужен новый план и цикл; не применяйте повторно план этого цикла.',
   'experiment.afterNeedsBaseline': 'Для повторного замера нужен действительный исходный замер.',
   'experiment.afterExists': 'Для этого цикла уже сохранён действительный повторный замер.',
+  'experiment.recoveryRequired': 'Замеры заблокированы до проверки операции с настройками или завершения восстановления. Проверьте действия с настройками ниже.',
   'experiment.operation.title': 'Текущая операция',
   'experiment.operation.stage': 'Этап',
   'experiment.operation.stage.warmingUp': 'Прогрев',

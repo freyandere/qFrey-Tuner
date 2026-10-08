@@ -8,9 +8,9 @@ export function Field({ id, label, hint, error, children }: { id: string; label:
     {hint && <p id={`${id}-hint`} className="field-hint">{hint}</p>}
     {error && <p id={`${id}-error`} className="field-error" role="alert">{error}</p>}</div>;
 }
-export function Card({ title, children }: { title: string; children: ReactNode }) {
+export function Card({ title, children, className = '' }: { title: string; children: ReactNode; className?: string }) {
   const id = useId();
-  return <section className="card" aria-labelledby={id}><h2 id={id}>{title}</h2>{children}</section>;
+  return <section className={`card ${className}`.trim()} aria-labelledby={id}><h2 id={id}>{title}</h2>{children}</section>;
 }
 export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'info' | 'warning' | 'error' }) {
   return <span className={`badge badge-${tone}`}>{children}</span>;

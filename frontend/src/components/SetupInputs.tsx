@@ -38,9 +38,9 @@ export function SetupInputs({ valueDraftInputs, onChange, onBuild, busy, canBuil
   const source = (value: InputSource) => <small>{t(`setup.source.${value}`)}</small>;
   const invalid = Object.values(validity).some(valid => !valid);
   return <Card title={t('setup.title')}>
-    <form onSubmit={event => { event.preventDefault(); if (!busy && canBuild && !invalid) onBuild(); }}>
+    <form className="setup-form" onSubmit={event => { event.preventDefault(); if (!busy && canBuild && !invalid) onBuild(); }}>
       <p>{t('setup.defaultsHint')}</p>
-      <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0 }}><legend>{t('setup.network')}</legend>
+      <fieldset disabled={busy} className="setup-group"><legend>{t('setup.network')}</legend>
         <NumericField id="setup-download" label={t('setup.downloadMbps')} value={input.network.downloadMbps} locale={locale} min={Number.MIN_VALUE} max={100000}
           onValidChange={downloadMbps => downloadMbps !== null && setNetwork({ downloadMbps })} onValidityChange={setValid('download')} />
         <label className="field">{t('setup.downloadSource')}{source(input.network.downloadSource)}</label>
@@ -54,7 +54,7 @@ export function SetupInputs({ valueDraftInputs, onChange, onBuild, busy, canBuil
           <small>{t('setup.vpnInterfaceHint')}</small></label>}
         <label><input type="checkbox" checked={input.network.ispThrottling} onChange={event => setNetwork({ ispThrottling: event.target.checked })} />{t('setup.ispThrottling')}</label>
       </fieldset>
-      <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0 }}><legend>{t('setup.hardware')}</legend>
+      <fieldset disabled={busy} className="setup-group"><legend>{t('setup.hardware')}</legend>
         <label className="field">{t('setup.storageType')}<select value={input.hardware.storageType} onChange={event => setHardware({ storageType: event.target.value as DraftInputs['hardware']['storageType'] })}>
           {(['hdd', 'ssdSata', 'nvme'] as const).map(value => <option key={value} value={value}>{t(`setup.storage.${value}`)}</option>)}</select></label>
         <NumericField id="setup-ram" label={t('setup.ramGiB')} value={input.hardware.ramGiB} locale={locale} min={1} max={1048576} integer
@@ -66,7 +66,7 @@ export function SetupInputs({ valueDraftInputs, onChange, onBuild, busy, canBuil
           onValidChange={performanceCores => performanceCores !== null && setHardware({ performanceCores })} onValidityChange={setValid('performanceCores')} />}
         <label className="field">{t('setup.hardwareSource')}{source(input.hardware.source)}</label>
       </fieldset>
-      <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0 }}><legend>{t('setup.usage')}</legend>
+      <fieldset disabled={busy} className="setup-group"><legend>{t('setup.usage')}</legend>
         <label className="field">{t('setup.trackerType')}<select value={input.usage.trackerType} onChange={event => setUsage({ trackerType: event.target.value as DraftInputs['usage']['trackerType'] })}>
           {(['public', 'private'] as const).map(value => <option key={value} value={value}>{t(`setup.tracker.${value}`)}</option>)}</select></label>
         <label className="field">{t('setup.userRole')}<select value={input.usage.userRole} onChange={event => setUsage({ userRole: event.target.value as DraftInputs['usage']['userRole'] })}>

@@ -81,4 +81,37 @@ test('basic recommendation review defaults to changes and keeps API identifiers 
   expect(html).toContain('aria-pressed="true">Basic</button>');
   expect(html).toContain('>Table</button>');
   expect(html).toContain('value="changed" selected=""');
+  expect(html).toContain('>Settings to review</h2>');
+  expect(html).not.toContain('>Recommendations</h2>');
+  expect(html).toContain('role="group" aria-label="Recommendation detail level"');
+  expect(html).toContain('role="group" aria-label="Recommendation layout"');
+  expect(html).toContain('class="recommendation-filters"');
+  expect(html).toContain('<dl class="recommendation-values">');
+});
+
+test('enum recommendation values have no count suffix and retain their labels in both locales', () => {
+  const recommendation: Recommendation = {
+    id: 'protocol', groupId: 'protocol', apiKey: 'bittorrent_protocol', category: 'connectivity',
+    titleKey: 'recommendations.bittorrent_protocol',
+    reason: { key: 'recommendations.reason.heuristic', parameters: {} }, evidence: 'heuristic',
+    currentValue: 1, proposedValue: 0, unit: 'count', valueType: 'enum', editable: true,
+    allowedRange: null, allowedValues: [
+      { value: 0, labelKey: 'settings.values.bittorrent_protocol.0' },
+      { value: 1, labelKey: 'settings.values.bittorrent_protocol.1' },
+    ], supportStatus: 'supported', selected: true, cautionCodes: [],
+  };
+  const plan: Plan = {
+    id: 'review', targetSessionId: 'session', revision: 1, createdUtc: '', inputsFingerprint: '', baselineFingerprint: '',
+    previewOnly: false, applicable: true, approved: false, blockReasonCodes: [], recommendations: [recommendation],
+    omissions: [], original: {}, proposed: {},
+  };
+  for (const locale of ['en-US', 'ru-RU'] as const) {
+    const html = renderToStaticMarkup(createElement(RecommendationList, {
+      plan, onSelections: () => undefined, busy: false, locale,
+    }));
+    expect(html).toContain('TCP');
+    expect(html).toContain('TCP ');
+    expect(html).not.toMatch(/TCP (?:count|шт\.)/);
+    expect(html).toContain(locale === 'en-US' ? '>Settings to review</h2>' : '>Настройки для проверки</h2>');
+  }
 });

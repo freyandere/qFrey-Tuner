@@ -53,12 +53,13 @@ export function createPlanSelections(plan: Plan, selectedGroup?: string, groupSe
 }
 
 function unit(item: Recommendation, t: (key: string) => string): string {
+  if (item.valueType === 'enum' || item.valueType === 'bool' || item.valueType === 'interface') return '';
   if (item.unit === 'bytesPerSecond') return t('units.kibPerSecond');
   if (item.unit === 'kibibytes') return t('units.kib');
   if (item.unit === 'mebibytes') return t('units.mebibytes');
   if (item.unit === 'connectionsPerSecond') return t('units.connectionsPerSecond');
   if (item.unit === 'percent') return t('units.percent');
-  return item.unit === 'boolean' || item.unit === 'interface' ? '' : t('metrics.count');
+  return '';
 }
 
 function displayValue(item: Recommendation, value: PreferenceValue | null, locale: Locale,
@@ -115,7 +116,7 @@ export function RecommendationList({ plan, onSelections, busy, locale }: Props) 
     setCategory('all'); setFilter('changed'); setQuery('');
   }, [plan?.id, plan?.revision]);
 
-  if (!plan) return <Card title={t('recommendations.title')}><p>{t('recommendations.noPlan')}</p></Card>;
+  if (!plan) return <Card title={t('recommendations.review.title')}><p>{t('recommendations.noPlan')}</p></Card>;
 
   const normalizedQuery = query.trim().toLocaleLowerCase(locale);
   const omittedKeys = new Set(plan.omissions.map(item => item.apiKey));
@@ -138,13 +139,13 @@ export function RecommendationList({ plan, onSelections, busy, locale }: Props) 
   const commit = (item: Recommendation, value: PreferenceValue) => onSelections(createPlanSelections(plan, undefined, undefined, item.apiKey, value));
   const setSelected = (groupId: string, selected: boolean) => onSelections(createPlanSelections(plan, groupId, selected));
 
-  const renderReason = (item: Recommendation) => <>
+  const renderReason = (item: Recommendation) => <div className="recommendation-reason">
     <p>{label(item.reason.key, item.reason.parameters)}</p>
     {item.cautionCodes.length > 0 && <ul>{item.cautionCodes.map(code => <li key={code}>
       {label(code, item.reason.parameters)}{advanced && <> <small>({code})</small></>}
     </li>)}</ul>}
     {advanced && <p><small>{t('recommendations.review.reasonCode')}: <code>{item.reason.key}</code></small></p>}
-  </>;
+  </div>;
 
   const renderProposed = (item: Recommendation) => {
     if (!advanced || !item.editable || item.supportStatus !== 'supported')
@@ -179,21 +180,24 @@ export function RecommendationList({ plan, onSelections, busy, locale }: Props) 
   const renderSelection = (item: Recommendation) => {
     const members = plan.recommendations.filter(candidate => candidate.groupId === item.groupId);
     const selected = members.every(candidate => candidate.selected);
-    return <label><input type="checkbox" checked={selected} disabled={busy || isOmitted(item)}
+    return <label className="recommendation-selection"><input type="checkbox" checked={selected} disabled={busy || isOmitted(item)}
       aria-label={`${t('recommendations.include')}: ${t(item.titleKey)}`} onChange={event => setSelected(item.groupId, event.target.checked)} />
       {t('recommendations.include')}</label>;
   };
 
-  const renderCard = (item: Recommendation) => <article className="card" key={item.id}>
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-      <h3>{t(item.titleKey)}</h3><Badge tone="info">{t('recommendations.heuristic')}</Badge>
+  const renderCard = (item: Recommendation) => <article className="card recommendation-card" key={item.id}>
+    <header className="recommendation-card-header">
+      <h3>{t(item.titleKey)}</h3><div className="recommendation-badges"><Badge tone="info">{t('recommendations.heuristic')}</Badge>
       <Badge>{t(`recommendations.review.category.${reviewCategory(item)}`)}</Badge>
       {item.supportStatus !== 'supported' && <Badge tone={item.supportStatus === 'missingRequired' ? 'error' : 'warning'}>
         {t(`recommendations.support.${item.supportStatus}`)}</Badge>}
-    </div>
+      </div>
+    </header>
     {renderReason(item)}
-    <p><strong>{t('recommendations.current')}:</strong> {displayValue(item, item.currentValue, locale, t)} {unit(item, t)}</p>
-    <p><strong>{t('recommendations.proposed')}:</strong> {renderProposed(item)}</p>
+    <dl className="recommendation-values">
+      <div><dt>{t('recommendations.current')}</dt><dd>{displayValue(item, item.currentValue, locale, t)} {item.currentValue === null ? '' : unit(item, t)}</dd></div>
+      <div><dt>{t('recommendations.proposed')}</dt><dd>{renderProposed(item)}</dd></div>
+    </dl>
     {advanced && <p><small>{t('recommendations.review.apiKey')}: <code>{item.apiKey}</code></small></p>}
     {renderSelection(item)}
     {advanced && (() => {
@@ -202,21 +206,30 @@ export function RecommendationList({ plan, onSelections, busy, locale }: Props) 
     })()}
   </article>;
 
-  return <Card title={t('recommendations.title')}>
+  return <Card title={t('recommendations.review.title')}>
     {plan.previewOnly && <StatusBanner severity="warning">{t('recommendations.previewOnly')} {t('recommendations.noBaseline')}</StatusBanner>}
     {!plan.applicable && plan.blockReasonCodes.length > 0 && <StatusBanner severity="warning">
       <p>{t('recommendations.blocked')}</p><strong>{t('recommendations.blockReasons')}</strong><ul>{plan.blockReasonCodes.map(code => <li key={code}>
         {label(`recommendations.blockReason.${code}`)}{advanced && <> <small>({code})</small></>}
       </li>)}</ul>
     </StatusBanner>}
-    <div className="form-actions" role="group" aria-label={t('recommendations.review.viewMode')}>
-      <button type="button" aria-pressed={!advanced} onClick={() => setAdvanced(false)}>{t('recommendations.review.basic')}</button>
-      <button type="button" aria-pressed={advanced} onClick={() => setAdvanced(true)}>{t('recommendations.review.advanced')}</button>
+    <div className="recommendation-controls">
+      <div className="recommendation-control-group" role="group" aria-label={t('recommendations.review.viewMode')}>
+        <span className="field-label">{t('recommendations.review.viewMode')}</span>
+        <div className="form-actions">
+          <button type="button" aria-pressed={!advanced} onClick={() => setAdvanced(false)}>{t('recommendations.review.basic')}</button>
+          <button type="button" aria-pressed={advanced} onClick={() => setAdvanced(true)}>{t('recommendations.review.advanced')}</button>
+        </div>
+      </div>
+      <div className="recommendation-control-group" role="group" aria-label={t('recommendations.review.layout')}>
+        <span className="field-label">{t('recommendations.review.layout')}</span>
+        <div className="form-actions">
+          <button type="button" aria-pressed={view === 'cards'} onClick={() => setView('cards')}>{t('recommendations.review.cards')}</button>
+          <button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')}>{t('recommendations.review.table')}</button>
+        </div>
+      </div>
     </div>
-    <div className="form-actions" role="group" aria-label={t('recommendations.review.layout')}>
-      <button type="button" aria-pressed={view === 'cards'} onClick={() => setView('cards')}>{t('recommendations.review.cards')}</button>
-      <button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')}>{t('recommendations.review.table')}</button>
-    </div>
+    <div className="recommendation-filters">
     <label className="field">{t('recommendations.review.search')}
       <input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t('recommendations.review.searchHint')} />
     </label>
@@ -228,9 +241,10 @@ export function RecommendationList({ plan, onSelections, busy, locale }: Props) 
       {(['changed', 'all', 'omitted', 'warnings'] as const).map(value =>
         <option key={value} value={value}>{t(`recommendations.filter.${value}`)}</option>)}
     </select></label>
-    <p aria-live="polite">{t('recommendations.review.count', { count: visible.length + visibleOmissions.length })}</p>
+    </div>
+    <p className="recommendation-count" aria-live="polite">{t('recommendations.review.count', { count: visible.length + visibleOmissions.length })}</p>
     {visible.length === 0 && visibleOmissions.length === 0 && <p>{t('recommendations.none')}</p>}
-    {view === 'cards' && <div style={{ display: 'grid', gap: 12 }}>{visible.map(renderCard)}
+    {view === 'cards' && <div className="recommendation-cards">{visible.map(renderCard)}
       {visibleOmissions.length > 0 && <section aria-labelledby="recommendation-omissions">
         <h3 id="recommendation-omissions">{t('recommendations.omissions')}</h3>
         <div style={{ display: 'grid', gap: 12 }}>{visibleOmissions.map(item => <article className="card" key={item.apiKey}>
@@ -250,7 +264,7 @@ export function RecommendationList({ plan, onSelections, busy, locale }: Props) 
         {visible.map(item => <tr key={item.id}>
           <td>{t(`recommendations.review.category.${reviewCategory(item)}`)}</td>
           <th scope="row">{t(item.titleKey)}{advanced && <><br /><code>{item.apiKey}</code></>}</th>
-          <td>{displayValue(item, item.currentValue, locale, t)} {unit(item, t)}</td>
+          <td>{displayValue(item, item.currentValue, locale, t)} {item.currentValue === null ? '' : unit(item, t)}</td>
           <td>{renderProposed(item)}</td><td>{label(item.reason.key, item.reason.parameters)}
             {item.cautionCodes.length > 0 && <ul>{item.cautionCodes.map(code => <li key={code}>{label(code, item.reason.parameters)}{advanced && <> <small>({code})</small></>}</li>)}</ul>}
             {advanced && <small>{t('recommendations.review.reasonCode')}: <code>{item.reason.key}</code></small>}

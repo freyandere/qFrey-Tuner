@@ -53,7 +53,9 @@ export function ExperimentFlow({ snapshot, onStart, onCancel }: Props) {
   const stateBlocked = snapshot.phase === 'recoveryRequired' || snapshot.applyStatus === 'pending' || snapshot.applyStatus === 'unverified';
   const ready = targetReady && inputsReady && !operationBusy && !pending && !stateBlocked && hashes.valid;
   const startDisabled = !ready || (afterMode ? !hasComparableWorkload || !baselineValid || afterValid : baselineValid);
-  const stageIndex = steps.indexOf(phaseStep[snapshot.phase]);
+  const measurementNeeded = !operationBusy && !stateBlocked && snapshot.phase !== 'rolledBack'
+    && (afterMode ? !afterValid : !baselineValid);
+  const stageIndex = steps.indexOf(snapshot.phase === 'draft' && (!targetReady || !inputsReady) ? 'preparation' : phaseStep[snapshot.phase]);
 
   const start = async () => {
     setSubmitted(true);
@@ -89,18 +91,22 @@ export function ExperimentFlow({ snapshot, onStart, onCancel }: Props) {
     && Number.isFinite(operation.progress) && operation.progress >= 0 && operation.progress <= 100 ? operation.progress : null;
 
   return <section className="card experiment-flow" aria-labelledby="experiment-flow-title">
-    <h2 id="experiment-flow-title">{t('experiment.title')}</h2>
-    <p>{t('experiment.description')}</p>
+    <h2 id="experiment-flow-title">{t('experiment.cycleTitle')}</h2>
     <ol aria-label={t('experiment.title')} className="experiment-steps">
       {steps.map((step, index) => <li key={step} aria-current={index === stageIndex ? 'step' : undefined}>
         {t(`experiment.steps.${step}`)}
       </li>)}
     </ol>
 
-    <section aria-labelledby="experiment-status-title">
+    <section className="experiment-current-step" aria-labelledby="experiment-status-title">
       <h3 id="experiment-status-title">{t('experiment.status.title')}</h3>
-      <p>{t(`experiment.phase.${snapshot.phase}`)}</p>
-      <dl>
+      <p><strong>{t(`experiment.phase.${snapshot.phase}`)}</strong></p>
+      {stateBlocked && <p role="status">{t('experiment.recoveryRequired')}</p>}
+      {snapshot.phase === 'rolledBack' && <p role="status">{t('experiment.rolledBackNewCycle')}</p>}
+      {!stateBlocked && snapshot.phase !== 'rolledBack' && (afterMode && afterValid
+        ? <p role="status">{t('experiment.afterExists')}</p>
+        : !afterMode && baselineValid && <p role="status">{t('experiment.baselineExists')}</p>)}
+      <dl className="experiment-summary">
         <dt>{t('experiment.status.baseline')}</dt>
         <dd>{t(experiment?.baseline ? `experiment.measurement.${experiment.baseline.status}` : 'experiment.status.notMeasured')}</dd>
         <dt>{t('experiment.status.after')}</dt>
@@ -113,7 +119,7 @@ export function ExperimentFlow({ snapshot, onStart, onCancel }: Props) {
       {!inputsReady && <p role="status">{t('experiment.inputsRequired')}</p>}
     </section>
 
-    {operationBusy && <section aria-labelledby="experiment-operation-title" role="status">
+    {operationBusy && <section className="experiment-operation" aria-labelledby="experiment-operation-title" role="status">
       <h3 id="experiment-operation-title">{t('experiment.operation.title')}</h3>
       <p><strong>{t('experiment.operation.stage')}:</strong> {translateExperimentStage(locale, operation.stage)}</p>
       {operation.kind === 'measurement' && <>
@@ -125,29 +131,29 @@ export function ExperimentFlow({ snapshot, onStart, onCancel }: Props) {
       </>}
     </section>}
 
-    {ownedSelected ? <div className="field">
-      <p>{experiment?.workload?.name}</p>
-      <p>{translateOwnedAction(locale, ownedReference ? 'measurement' : 'unverified')}</p>
-      {ownedReference && <p><code>{ownedReference.hashes.join(' ')}</code></p>}
-    </div> : <div className="field">
-      <label htmlFor="experiment-hashes">{t(afterMode ? 'experiment.afterHashes.label' : 'experiment.hashes.label')}</label>
-      <textarea id="experiment-hashes" rows={4} value={afterMode ? frozenHashesText : hashText} onChange={event => setHashText(event.target.value)}
-        readOnly={afterMode} aria-describedby="experiment-hashes-hint" aria-invalid={submitted && !hashes.valid} disabled={operationBusy || pending} />
-      <p id="experiment-hashes-hint" className="field-hint">{t('experiment.hashes.hint')}</p>
-      {(afterMode ? frozenHashesText : hashText).trim() && hashes.valid && <p>{t('experiment.hashes.count', { count: hashes.hashes.length })}</p>}
-      {submitted && !hashes.valid && <p className="field-error" role="alert">{t('experiment.hashes.invalid')}</p>}
-    </div>}
+    {measurementNeeded && <section className="experiment-measurement" aria-labelledby="experiment-measurement-title">
+      <h3 id="experiment-measurement-title">{t(afterMode ? 'experiment.steps.after' : 'experiment.steps.baseline')}</h3>
+      <p>{t('experiment.description')}</p>
+      {ownedSelected ? <div className="field">
+        <p>{experiment?.workload?.name}</p>
+        <p>{translateOwnedAction(locale, ownedReference ? 'measurement' : 'unverified')}</p>
+        {ownedReference && <p><code>{ownedReference.hashes.join(' ')}</code></p>}
+      </div> : <div className="field">
+        <label htmlFor="experiment-hashes">{t(afterMode ? 'experiment.afterHashes.label' : 'experiment.hashes.label')}</label>
+        <textarea id="experiment-hashes" rows={4} value={afterMode ? frozenHashesText : hashText} onChange={event => setHashText(event.target.value)}
+          readOnly={afterMode} aria-describedby="experiment-hashes-hint" aria-invalid={submitted && !hashes.valid} disabled={operationBusy || pending} />
+        <p id="experiment-hashes-hint" className="field-hint">{t('experiment.hashes.hint')}</p>
+        {(afterMode ? frozenHashesText : hashText).trim() && hashes.valid && <p>{t('experiment.hashes.count', { count: hashes.hashes.length })}</p>}
+        {submitted && !hashes.valid && <p className="field-error" role="alert">{t('experiment.hashes.invalid')}</p>}
+      </div>}
 
-    {afterMode && !baselineValid && <p role="status">{t('experiment.afterNeedsBaseline')}</p>}
-    {afterMode && afterValid && <p role="status">{t('experiment.afterExists')}</p>}
-    {afterMode && !hasComparableWorkload && <p role="status">{t('experiment.afterWorkloadMissing')}</p>}
-    {snapshot.phase === 'rolledBack' && <p role="status">{t('experiment.rolledBackNewCycle')}</p>}
-    {!afterMode && baselineValid && snapshot.phase !== 'rolledBack' && <p role="status">{t('experiment.baselineExists')}</p>}
+      {afterMode && !baselineValid && <p role="status">{t('experiment.afterNeedsBaseline')}</p>}
+      {afterMode && !hasComparableWorkload && <p role="status">{t('experiment.afterWorkloadMissing')}</p>}
+      <div className="form-actions"><button type="button" disabled={startDisabled} onClick={start}>
+        {pending ? t('experiment.starting') : t(afterMode ? 'experiment.start.after' : 'experiment.start.baseline')}
+      </button></div>
+    </section>}
     {error && <p className="field-error" role="alert">{error}</p>}
     {notice && <p role="status">{notice}</p>}
-    <button type="button" disabled={startDisabled} onClick={start}>
-      {pending ? t('experiment.starting') : t(afterMode ? 'experiment.start.after' : 'experiment.start.baseline')}
-    </button>
-
   </section>;
 }

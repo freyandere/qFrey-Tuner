@@ -1,6 +1,6 @@
 # Browser QA runners
 
-These scripts use the installed Playwright API directly. They do not use the Playwright Test runner, which stalled before test discovery in this environment. The frontend shell mock is labeled in-page and cannot connect to qBittorrent. The WebView runner checks for the isolated local shell and `Not connected` status before interacting.
+The standard Playwright Test suite runs with `pnpm run test:e2e:web` after loading `scripts/dev-env.ps1`. That environment disables Playwright 1.52's experimental TypeScript ESM loader, which hangs during discovery on Node 24 in this Windows environment. The additional manual scripts use the installed Playwright API directly. The frontend shell mock is labeled in-page and cannot connect to qBittorrent. The WebView runner checks for the isolated local shell and `Not connected` status before interacting.
 
 Tools used: Node 24.19.0, pnpm 11.19.0, Vite 6.3.5, Playwright 1.52.0, Edge 154.0.4258.53.
 

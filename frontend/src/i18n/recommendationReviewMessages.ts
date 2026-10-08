@@ -1,4 +1,5 @@
 export const enRecommendationReviewMessages = {
+  'recommendations.review.title': 'Settings to review',
   'recommendations.review.viewMode': 'Recommendation detail level',
   'recommendations.review.basic': 'Basic', 'recommendations.review.advanced': 'Advanced',
   'recommendations.review.layout': 'Recommendation layout', 'recommendations.review.cards': 'Cards',
@@ -20,6 +21,7 @@ export const enRecommendationReviewMessages = {
 } as const;
 
 export const ruRecommendationReviewMessages: Record<keyof typeof enRecommendationReviewMessages, string> = {
+  'recommendations.review.title': 'Настройки для проверки',
   'recommendations.review.viewMode': 'Подробность рекомендаций',
   'recommendations.review.basic': 'Основной', 'recommendations.review.advanced': 'Расширенный',
   'recommendations.review.layout': 'Вид рекомендаций', 'recommendations.review.cards': 'Карточки',

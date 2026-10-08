@@ -1,5 +1,16 @@
 # Migration execution progress
 
+## Resumed UI hierarchy and design rules — 2026-10-08
+
+User explicitly resumed work after the pause below. The UI hierarchy corrections,
+shared spacing, state/action presentation and regression checks are documented in
+[the continuation report](ui-hierarchy-2026-10-08.md). Future UI changes must follow
+[UI design rules](../ui-design-system.md), linked from AGENTS.md and the installed
+spacing-audit skill. Frontend typecheck, 125 unit tests and production build passed;
+the Playwright loader workaround restores the standard four browser tests.
+Native DPI/dialogs, real-client acceptance and the 30-minute load gate remain
+unaccepted. No release binary was replaced. G2–G5 remain incomplete.
+
 ## Paused by user — 2026-10-08
 
 This supersedes active assignments below. User explicitly paused until a later continuation. No automatic implementation/test restart or packaging. UI is NOT accepted: repeated headings, unseparated control groups, filter/card rhythm and enum values suffixed with count need correction. Russian Experiment repetition/status/action grouping needs reproduction. Full report and next actions: [UI checkpoint](ui-checkpoint-2026-10-08-ru.md); [spacing audit](ui-audit-2026-10-08.md).

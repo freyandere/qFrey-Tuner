@@ -12,6 +12,12 @@ import { enRestoreMessages, ruRestoreMessages } from '../components/restoreMessa
 import { enOwnedActionMessages, ruOwnedActionMessages } from '../components/ownedActionMessages';
 import { enLifecycleMessages, ruLifecycleMessages } from '../components/lifecycleMessages';
 export const en = {
+  'screen.overview.description': 'Connect to qBittorrent and check live transfer metrics before starting an experiment.',
+  'screen.setup.description': 'Review connection speeds, hardware and usage, then build a settings plan.',
+  'screen.recommendations.description': 'Compare current and proposed settings, choose changes and review their limits.',
+  'screen.experiment.description': 'Measure a baseline, review and apply the plan, then compare a second measurement.',
+  'screen.results.description': 'Review measured changes, limitations and the settings verification outcome.',
+  'screen.history.description': 'Open saved cycles or review a backup for restoration.',
   'navigation.setup': 'Go to setup and build a plan',
   'navigation.experiment': 'Go to the experiment',
   'navigation.history': 'Browse saved experiments',
@@ -131,6 +137,12 @@ export const en = {
 } as const;
 export type TranslationKey = keyof typeof en;
 export const ru: Record<TranslationKey, string> = {
+  'screen.overview.description': 'Подключитесь к qBittorrent и проверьте текущие показатели передачи перед началом эксперимента.',
+  'screen.setup.description': 'Проверьте скорость подключения, оборудование и сценарий использования, затем постройте план настроек.',
+  'screen.recommendations.description': 'Сравните текущие и предложенные настройки, выберите изменения и изучите ограничения.',
+  'screen.experiment.description': 'Выполните исходный замер, проверьте и примените план, затем сравните повторный замер.',
+  'screen.results.description': 'Просмотрите измеренные изменения, ограничения и результат проверки настроек.',
+  'screen.history.description': 'Откройте сохранённые циклы или проверьте резервную копию для восстановления.',
   'navigation.setup': 'Перейти к условиям и построить план',
   'navigation.experiment': 'Перейти к эксперименту',
   'navigation.history': 'Открыть сохранённые эксперименты',

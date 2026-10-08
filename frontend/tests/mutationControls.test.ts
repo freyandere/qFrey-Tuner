@@ -30,6 +30,17 @@ const confirmation = (overrides: Partial<ConfirmationSummary> = {}): Confirmatio
 });
 
 describe('MutationControls guards', () => {
+  it('shows a shared unavailable reason once and keeps mutation actions disabled', () => {
+    for (const locale of ['en-US', 'ru-RU'] as const) {
+      const value = snapshot({ availableActions: [], preferences: { locale, theme: 'light' } });
+      const html = renderToStaticMarkup(createElement(MutationControls, { snapshot: value,
+        onApprove: async () => {}, onRequest: async () => confirmation(), onApply: async () => {},
+        onRollback: async () => {}, onKeep: async () => {} }));
+      const reason = locale === 'en-US' ? enMutationMessages['mutation.unavailable'] : ruMutationMessages['mutation.unavailable'];
+      expect(html.split(reason)).toHaveLength(2);
+      expect(html.match(/disabled=""/g)).toHaveLength(4);
+    }
+  });
   it('requires target/session and an applicable canonical plan for approval', () => {
     expect(canApprovePlan(snapshot()).allowed).toBe(true);
     expect(canApprovePlan(snapshot({ connection: 'disconnected' })).reason).toBe('target');

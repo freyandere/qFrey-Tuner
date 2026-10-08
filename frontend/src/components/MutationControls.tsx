@@ -162,6 +162,12 @@ export function MutationControls({ snapshot, onApprove, onRequest, onApply, onRo
   const applyDecision = canApplyPlan(snapshot);
   const rollbackDecision = canRollback(snapshot);
   const keepDecision = canKeepSettings(snapshot);
+  const blockedReasons = [...new Set([
+    ...(plan && !approveDecision.allowed ? [reasonText(snapshot, approveDecision)] : []),
+    ...(plan && !applyDecision.allowed ? [reasonText(snapshot, applyDecision)] : []),
+    ...(plan && !rollbackDecision.allowed && snapshot.applyStatus !== 'notApplied' ? [reasonText(snapshot, rollbackDecision)] : []),
+    ...(!keepDecision.allowed && snapshot.applyStatus === 'verified' ? [reasonText(snapshot, keepDecision)] : []),
+  ])];
   const validPending = pending !== null && isCurrentConfirmation(pending, snapshot, now);
   const expires = pending ? Date.parse(pending.summary.expiresUtc) : 0;
   const expiresLabel = Number.isFinite(expires) ? new Intl.DateTimeFormat(locale, { timeStyle: 'medium' }).format(expires) : '—';
@@ -173,17 +179,16 @@ export function MutationControls({ snapshot, onApprove, onRequest, onApply, onRo
 
   return <Card title={translateMutation(locale, 'mutation.title')}>
     {!plan && <StatusBanner>{translateMutation(locale, 'mutation.planUnavailable')}</StatusBanner>}
+    {blockedReasons.map(reason => <p className="field-hint" key={reason}>{reason}</p>)}
+    {plan?.approved && <p className="field-hint">{translateMutation(locale, 'mutation.approvedNotice')}</p>}
+    <div className="form-actions">
     {plan && <>
-      {!approveDecision.allowed && <p className="field-hint">{reasonText(snapshot, approveDecision)}</p>}
       <Button disabled={busy || !approveDecision.allowed} onClick={approve}>{busy ? translateMutation(locale, 'mutation.approving') : translateMutation(locale, 'mutation.approve')}</Button>
-      {plan.approved && <p className="field-hint">{translateMutation(locale, 'mutation.approvedNotice')}</p>}
-      {!applyDecision.allowed && <p className="field-hint">{reasonText(snapshot, applyDecision)}</p>}
       <Button disabled={busy || !applyDecision.allowed} onClick={() => void request('ApplyPlan')}>{translateMutation(locale, 'mutation.apply')}</Button>
-      {!rollbackDecision.allowed && snapshot.applyStatus !== 'notApplied' && <p className="field-hint">{reasonText(snapshot, rollbackDecision)}</p>}
       <Button disabled={busy || !rollbackDecision.allowed} onClick={() => void request('Rollback')}>{translateMutation(locale, 'mutation.rollback')}</Button>
     </>}
-    {!keepDecision.allowed && snapshot.applyStatus === 'verified' && <p className="field-hint">{reasonText(snapshot, keepDecision)}</p>}
     <Button disabled={busy || !keepDecision.allowed} onClick={() => void keep()}>{translateMutation(locale, 'mutation.keep')}</Button>
+    </div>
     {snapshot.applyStatus === 'verified' && <p className="field-hint">{translateMutation(locale, 'mutation.keepNotice')}</p>}
     {error && <StatusBanner severity="error">{error}</StatusBanner>}
     <Dialog open={pending !== null} title={translateMutation(locale, 'mutation.confirmTitle')} onClose={() => setPending(null)}>

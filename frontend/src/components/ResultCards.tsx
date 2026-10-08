@@ -11,7 +11,7 @@ export function ResultCards({ summary, locale, historical }: Props) {
   const t = (key: string, parameters: Readonly<Record<string, string | number>> = {}) => resultMessage(locale, key, parameters);
   if (!summary) return <Card title={t('results.title')}><p>{t('results.summaryUnavailable')}</p></Card>;
 
-  return <Card title={t('results.title')}>
+  return <Card title={t('results.title')} className="result-summary">
     <StatusBanner>{t(historical ? 'results.historicalBanner' : 'results.currentBanner')}</StatusBanner>
     <dl>
       <div><dt>{t('results.cycleId')}</dt><dd>{summary.cycleId ?? '—'}</dd></div>

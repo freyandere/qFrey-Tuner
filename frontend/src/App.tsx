@@ -235,9 +235,9 @@ export function App() {
       <label>{t('theme')}<select aria-label={t('theme')} value={theme} disabled={!snapshot || busy} onChange={e => void preferences(locale, e.target.value as ThemePreference)}>{(['system', 'dark', 'light'] as const).map(value => <option key={value} value={value}>{t(value)}</option>)}</select></label></div>
     </header>
     <div className="workspace"><nav aria-label="qFrey-Tuner">{screens.map(id => <button key={id} aria-current={screen === id ? 'page' : undefined} onClick={() => navigate(id)}>{t(id)}</button>)}</nav>
-      <main><p className="eyebrow">{t(screen)}</p><h1 ref={heading} tabIndex={-1}>{screen === 'overview' ? t('title') : t(screen)}</h1>
-        <p className="intro">{t('introduction')}</p>
-        {snapshot?.activeOperation && <section className="notice" role="status" aria-label={t('experiment.operation.title')}>
+      <main><h1 ref={heading} tabIndex={-1}>{screen === 'overview' ? t('title') : t(screen)}</h1>
+        <p className="intro">{t(`screen.${screen}.description`)}</p>
+        {snapshot?.activeOperation && !(screen === 'experiment' && snapshot.activeOperation.kind === 'measurement') && <section className="notice" role="status" aria-label={t('experiment.operation.title')}>
           <strong>{t('experiment.operation.title')}</strong>
           {snapshot.activeOperation.progress === null ? <progress aria-label={t('experiment.operation.progress')} />
             : <progress aria-label={t('experiment.operation.progress')} max={100} value={snapshot.activeOperation.progress} />}

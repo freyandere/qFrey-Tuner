@@ -106,8 +106,10 @@ describe('ExperimentFlow', () => {
     expect(render({ ...owned, experiment: { ...owned.experiment!, workload: {
       ...owned.experiment!.workload!, ownershipVerified: false,
     } } })).toContain('disabled=""');
-    expect(render({ ...owned, phase: 'recoveryRequired' })).toContain('disabled=""');
-    expect(render({ ...owned, applyStatus: 'unverified' })).toContain('disabled=""');
+    for (const blocked of [{ ...owned, phase: 'recoveryRequired' as const }, { ...owned, applyStatus: 'unverified' as const }]) {
+      expect(render(blocked)).not.toContain('Start baseline measurement');
+      expect(render(blocked)).toContain('Measurements are blocked');
+    }
   });
 
   it('treats a rolled-back cycle as historical and directs the user to a new plan and cycle', () => {
@@ -133,12 +135,41 @@ describe('ExperimentFlow', () => {
     expect(html).toContain('Stage:</strong> Sampling');
     expect(html).toContain('value="37"');
     expect(html).toContain('Cancel measurement');
+    expect(html).not.toContain('Start baseline measurement');
+    expect(html).not.toContain('<textarea');
 
     const indeterminate = render(snapshot({ activeOperation: { ...operation, progress: null, cancellable: false } }));
     expect(indeterminate).toContain('Progress is not reported.');
     expect(indeterminate).not.toContain('value="37"');
     expect(indeterminate).not.toContain('Cancel measurement');
     expect(indeterminate).toContain('This operation cannot be cancelled here.');
+  });
+
+  it('replaces completed measurement inputs and start actions with the next-step status in both locales', () => {
+    const baseline = {
+      id: 'baseline', kind: 'baseline' as const, status: 'valid' as const, startedUtc: '2026-10-07T00:00:00Z',
+      analysisVersion: '1', scope: 'workload' as const, reasonCodes: [], sampleCount: 70, durationMs: 70000,
+      meanDownload: { quality: 'notMeasured' as const, reasonCodes: [] }, medianDownload: { quality: 'notMeasured' as const, reasonCodes: [] },
+      standardDeviation: { quality: 'notMeasured' as const, reasonCodes: [] }, zeroSamplePercent: { quality: 'notMeasured' as const, reasonCodes: [] },
+    };
+    for (const locale of ['en-US', 'ru-RU'] as const) {
+      const value = snapshot({ preferences: { locale, theme: 'light' }, phase: 'baselineReady',
+        experiment: { ...snapshot().experiment!, baseline } });
+      const html = render(value);
+      expect(html).toContain(translateExperiment(locale, 'experiment.cycleTitle'));
+      expect(html).toContain(translateExperiment(locale, 'experiment.baselineExists'));
+      expect(html).not.toContain(translateExperiment(locale, 'experiment.start.baseline'));
+      expect(html).not.toContain('<textarea');
+      expect(html).not.toContain(translateExperiment(locale, 'experiment.description'));
+      expect(html).not.toContain(`<h2 id="experiment-flow-title">${translateExperiment(locale, 'experiment.title')}</h2>`);
+
+      const completed = render({ ...value, phase: 'completed', applyStatus: 'verified', experiment: {
+        ...value.experiment!, after: { ...baseline, id: 'after', kind: 'after' },
+      } });
+      expect(completed).toContain(translateExperiment(locale, 'experiment.afterExists'));
+      expect(completed).not.toContain(translateExperiment(locale, 'experiment.start.after'));
+      expect(completed).not.toContain('<textarea');
+    }
   });
 
   it('localizes known operation stages and hides unknown raw stage labels', () => {

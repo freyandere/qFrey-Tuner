@@ -21,7 +21,7 @@ export function HistoryList({ page, locale, busy, onNext, onOpen }: Props) {
     {page && page.items.length > 0 && <>
       <div className="metric-table" role="region" tabIndex={0} aria-label={t('history.title')}>
         <table>
-          <caption>{t('history.title')}</caption>
+          <caption className="sr-only">{t('history.title')}</caption>
           <thead><tr>
             <th scope="col">{t('history.date')}</th>
             <th scope="col">{t('history.endpoint')}</th>
