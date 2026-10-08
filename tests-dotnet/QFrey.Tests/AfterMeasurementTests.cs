@@ -22,6 +22,25 @@ public sealed class AfterMeasurementTests
     }
 
     [Fact]
+    public void OwnedAfterRequiresFreshOwnershipAndExactFrozenReference()
+    {
+        var original = ValidCycle();
+        var workload = original.Experiment.Workload!;
+        var owned = workload with { Reference = workload.Reference with { Kind = WorkloadKind.Owned }, OwnershipVerified = true };
+        var cycle = original with { Experiment = original.Experiment with { Workload = owned } };
+        Assert.Equal(ErrorCodes.BaselineRequired, Assert.Throws<QbittorrentException>(() =>
+            BridgeDispatcher.ValidateAfterCycle(cycle, SessionId, cycle.Plan, owned.Reference)).Code);
+        var expected = BridgeDispatcher.ValidateAfterCycle(cycle, SessionId, cycle.Plan, owned.Reference, ownedVerified: true);
+        Assert.Equal(cycle.BaselineContext!.Preferences.Count, expected.Count);
+        Assert.Equal(ErrorCodes.BaselineRequired, Assert.Throws<QbittorrentException>(() =>
+            BridgeDispatcher.ValidateAfterCycle(cycle, SessionId, cycle.Plan,
+                owned.Reference with { Id = Guid.NewGuid() }, ownedVerified: true)).Code);
+        var untrusted = cycle with { Experiment = cycle.Experiment with { Workload = owned with { OwnershipVerified = false } } };
+        Assert.Equal(ErrorCodes.BaselineRequired, Assert.Throws<QbittorrentException>(() =>
+            BridgeDispatcher.ValidateAfterCycle(untrusted, SessionId, cycle.Plan, owned.Reference, ownedVerified: true)).Code);
+    }
+
+    [Fact]
     public void RejectsDifferentWorkloadIdKindOrHashes()
     {
         var cycle = ValidCycle();

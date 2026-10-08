@@ -27,6 +27,31 @@ public sealed class ExperimentSafetyTests
     }
 
     [Fact]
+    public async Task OwnedBaselineRequiresFreshOwnershipVerifierAndPreservesItsFailure()
+    {
+        var api = new SafetyApi();
+        using var session = await Connect(api);
+        var existing = Cycle(session);
+        var workload = existing.Experiment.Workload!;
+        var owned = workload with { Reference = workload.Reference with { Kind = WorkloadKind.Owned }, OwnershipVerified = true };
+        var cycle = existing with { Experiment = existing.Experiment with { Workload = owned } };
+        await AssertBaselineRequired(cycle, session);
+        var verified = 0;
+        await ExperimentCommands.ValidateBaselineAsync(cycle, session, default, (reference, _) =>
+        {
+            Assert.Equal(owned.Reference, reference);
+            verified++;
+            return Task.CompletedTask;
+        });
+        Assert.Equal(1, verified);
+        var error = await Assert.ThrowsAsync<QbittorrentException>(() =>
+            ExperimentCommands.ValidateBaselineAsync(cycle, session, default,
+                (_, _) => throw new QbittorrentException(ErrorCodes.WorkloadNotOwned)));
+        Assert.Equal(ErrorCodes.WorkloadNotOwned, error.Code);
+        Assert.All(api.Calls, call => Assert.Equal(HttpMethod.Get, call.Method));
+    }
+
+    [Fact]
     public async Task MissingBaselineOrFrozenExistingWorkloadIsRejected()
     {
         var api = new SafetyApi();

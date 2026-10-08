@@ -58,6 +58,7 @@ public sealed record AppSnapshot(int ProtocolVersion, int SchemaVersion, string 
     public NetworkTestResult? NetworkTest { get; init; }
     public TargetInterface[] Interfaces { get; init; } = [];
     public WorkloadCatalogueSummary[] WorkloadCatalogue { get; init; } = [];
+    public IReadOnlyList<WorkloadSummary>? OwnedWorkloadCandidates { get; init; }
     public RestorePreview? Restore { get; init; }
 }
 public sealed record WorkloadCatalogueSummary(string Id, string Name, string TotalBytesDecimal, string MetadataSource);
@@ -147,6 +148,16 @@ public static class Protocol
                 || !string.IsNullOrEmpty(source.UserInfo))) throw new JsonException("INVALID_WORKLOAD_CATALOGUE");
         if (snapshot.NetworkTest is { } network && (network.DownloadBytesPerSecond < 0 || network.UploadBytesPerSecond < 0))
             throw new JsonException("INVALID_NETWORK_TEST");
+        if (snapshot.OwnedWorkloadCandidates is { } candidates && (candidates.Count > 128
+            || candidates.Any(w => w is null || w.Reference is null || w.Reference.Kind != WorkloadKind.Owned
+                || w.Reference.Id == Guid.Empty || w.Reference.Hashes is null || w.Reference.Hashes.Length != 1
+                || w.Reference.Hashes.Any(hash => hash is null || hash.Length != 40 || !hash.All(Uri.IsHexDigit))
+                || string.IsNullOrWhiteSpace(w.Name) || string.IsNullOrWhiteSpace(w.ServerSavePath)
+                || !ulong.TryParse(w.TotalBytesDecimal, System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out _) || w.ReasonCodes is null
+                || w.ReasonCodes.Length > 600 || w.ReasonCodes.Any(string.IsNullOrWhiteSpace))
+            || candidates.Select(w => w.Reference.Id).Distinct().Count() != candidates.Count))
+            throw new JsonException("INVALID_OWNED_WORKLOAD_CANDIDATES");
         if (snapshot.Restore is { } restore && (string.IsNullOrWhiteSpace(restore.SelectionToken) || restore.SelectionToken.Length > 128
             || restore.DisplayName is null || restore.DisplayName.Length > 512 || restore.SourceCycleId == Guid.Empty
             || restore.Review is null || restore.Review.Fingerprint is not { Length: 64 } fingerprint || !fingerprint.All(Uri.IsHexDigit)

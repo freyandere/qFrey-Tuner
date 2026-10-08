@@ -2,10 +2,38 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import { parseRequest } from '../src/contracts/requestValidation';
-import { acceptedOperation, experiment, measurement, plan, resultCard } from '../src/contracts/validation';
+import { acceptedOperation, experiment, measurement, plan, resultCard, networkTest } from '../src/contracts/validation';
 import { isSnapshot } from '../src/bridge/client';
 const directory = resolve(import.meta.dirname, '../../tests-contract/fixtures/protocol');
 const read = (file: string): unknown => JSON.parse(readFileSync(resolve(directory, file), 'utf8'));
+
+test('owned start and explicit selection reject missing authority and empty identities', () => {
+  const base = read('product-command-cancel.json') as Record<string, unknown>;
+  const workloadId = '11111111-1111-1111-1111-111111111111';
+  for (const [command, payload] of [
+    ['StartOwnedWorkload', { workloadId, confirmationToken: 'confirmed' }],
+    ['SelectOwnedWorkload', { workloadId }],
+  ] as const) {
+    expect(parseRequest(JSON.stringify({ ...base, command, payload })).command).toBe(command);
+    expect(() => parseRequest(JSON.stringify({ ...base, command, payload: { ...payload, workloadId: '00000000-0000-0000-0000-000000000000' } }))).toThrow();
+    expect(() => parseRequest(JSON.stringify({ ...base, command, targetSessionId: null, payload }))).toThrow();
+  }
+  expect(() => parseRequest(JSON.stringify({ ...base, command: 'StartOwnedWorkload', payload: { workloadId, confirmationToken: '' } }))).toThrow();
+});
+
+test('partial network measurements and bounded unique owned candidates survive snapshot validation', () => {
+  const base = read('product-applied-verified.json') as Record<string, unknown>;
+  const measured = { downloadBytesPerSecond: 123.5, uploadBytesPerSecond: null, measuredUtc: '2026-10-08T00:00:00Z', reasonCodes: ['NETWORK_UPLOAD_UNAVAILABLE'] };
+  expect(networkTest(measured)).toBe(true);
+  expect(networkTest({ ...measured, downloadBytesPerSecond: -1 })).toBe(false);
+  expect(networkTest({ ...measured, uploadBytesPerSecond: undefined })).toBe(false);
+  const owned = { reference: { id: '11111111-1111-1111-1111-111111111111', kind: 'owned', hashes: ['a'.repeat(40)] }, name: 'Owned',
+    totalBytesDecimal: '4096', serverSavePath: '/downloads/owned', catalogueId: 'owned', ownershipVerified: true, reasonCodes: [] };
+  expect(isSnapshot({ ...base, networkTest: measured, ownedWorkloadCandidates: [owned] }, base.revision as number)).toBe(true);
+  expect(isSnapshot({ ...base, ownedWorkloadCandidates: [owned, owned] }, base.revision as number)).toBe(false);
+  expect(isSnapshot({ ...base, ownedWorkloadCandidates: [{ ...owned, reference: { ...owned.reference, hashes: ['a'.repeat(40), 'b'.repeat(40)] } }] }, base.revision as number)).toBe(false);
+  expect(isSnapshot({ ...base, ownedWorkloadCandidates: [{ ...owned, reference: { ...owned.reference, kind: 'existing' } }] }, base.revision as number)).toBe(false);
+});
 
 test.each(readdirSync(directory).filter(f => f.startsWith('product-command-')))('accepts shared typed request %s', file => {
   expect(parseRequest(readFileSync(resolve(directory, file), 'utf8')).protocolVersion).toBe(1);

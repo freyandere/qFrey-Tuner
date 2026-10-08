@@ -27,7 +27,13 @@ public sealed partial class BridgeDispatcher
             operationTarget.ApiVersion, operationTarget.LibtorrentVersion);
         var cycle = await cycles.ReadAsync(currentCycle.CycleId, expectedTarget, token).ConfigureAwait(false)
             ?? throw new QbittorrentException(ErrorCodes.BaselineRequired);
-        var expectedPreferences = ValidateAfterCycle(cycle, operationTarget.SessionId, experiment?.Plan, payload.Workload);
+        var ownedVerified = false;
+        if (payload.Workload.Kind == WorkloadKind.Owned)
+        {
+            await ResolveOwnedMeasurementAsync(payload.Workload, token).ConfigureAwait(false);
+            ownedVerified = true;
+        }
+        var expectedPreferences = ValidateAfterCycle(cycle, operationTarget.SessionId, experiment?.Plan, payload.Workload, ownedVerified);
 
         var operationSessionId = operationTarget.SessionId;
         var wasCollecting = collectorCancellation is not null;
@@ -208,7 +214,7 @@ public sealed partial class BridgeDispatcher
     }
 
     internal static Dictionary<string, PreferenceValue> ValidateAfterCycle(CycleRecord cycle, Guid sessionId,
-        Plan? currentPlan, WorkloadReference requested)
+        Plan? currentPlan, WorkloadReference requested, bool ownedVerified = false)
     {
         var baseline = cycle.Experiment.Baseline;
         var context = cycle.BaselineContext;
@@ -221,8 +227,9 @@ public sealed partial class BridgeDispatcher
             || baseline is null || baseline.Kind != MeasurementKind.Baseline || baseline.Status != MeasurementStatus.Valid
             || baseline.AnalysisVersion != MeasurementAnalysis.Version || baseline.Id == Guid.Empty
             || MeasurementAnalysis.Analyze(baseline.Id, baseline.Kind, baseline.StartedUtc, baseline.Scope, cycle.BaselineSamples).Status != MeasurementStatus.Valid
-            || context is null || reference is null || reference.Kind != WorkloadKind.Existing || requested is null
-            || requested.Kind != WorkloadKind.Existing || requested.Id != reference.Id || requested.Hashes is null
+            || context is null || reference is null || reference.Kind is not (WorkloadKind.Existing or WorkloadKind.Owned) || requested is null
+            || reference.Kind == WorkloadKind.Owned && (!ownedVerified || workload!.OwnershipVerified != true)
+            || requested.Kind != reference.Kind || requested.Id != reference.Id || requested.Hashes is null
             || !requested.Hashes.SequenceEqual(reference.Hashes, StringComparer.OrdinalIgnoreCase)
             || context.Preferences is null || context.PreferencesFingerprint != PlanBuilder.FingerprintPreferences(context.Preferences)
             || cycle.Plan.BaselineFingerprint != context.PreferencesFingerprint)

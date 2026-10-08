@@ -20,7 +20,7 @@ public enum ResultContext { Historical, CurrentExperiment }
 public enum MeasurementKind { Baseline, After }
 public enum WorkloadKind { Existing, Owned }
 public enum ReportFormat { Json, Html }
-public enum OperationKind { NetworkTest, HardwareDetection, Measurement, PrepareWorkload, StopWorkload, DeleteWorkload, Apply, Rollback, Restore, StartTarget, StopTarget, RestartTarget }
+public enum OperationKind { NetworkTest, HardwareDetection, Measurement, PrepareWorkload, StopWorkload, DeleteWorkload, Apply, Rollback, Restore, StartTarget, StopTarget, RestartTarget, StartWorkload }
 
 // qBittorrent preference values are int/bool/string. Floats and boolean-as-int are never interchangeable.
 [JsonConverter(typeof(PreferenceValueConverter))]
@@ -150,5 +150,5 @@ public sealed record ObservedHardware(HardwareInputs? Inputs, HardwareFacts Fact
 public sealed record HardwareFacts(MetricReading RamBytes, MetricReading LogicalCpuCount,
     MetricReading PerformanceCpuCount, StorageType? StorageType, string? StorageReasonCode, string? VolumeToken);
 public sealed record TargetInterface(string Id, string Name);
-public sealed record NetworkTestResult(double DownloadBytesPerSecond, double UploadBytesPerSecond,
+public sealed record NetworkTestResult(double? DownloadBytesPerSecond, double? UploadBytesPerSecond,
     DateTimeOffset MeasuredUtc, string[] ReasonCodes);

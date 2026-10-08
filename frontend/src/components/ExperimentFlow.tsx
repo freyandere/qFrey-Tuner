@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { WorkloadReference } from '../contracts/domain';
 import type { AppSnapshot, ExperimentPhase } from '../contracts/protocol';
 import { parseExistingHashes, translateExperiment, translateExperimentStage } from './experimentMessages';
+import { ownedMeasurementReference } from './OwnedWorkloadControls';
+import { translateOwnedAction } from './ownedActionMessages';
 
 type Props = {
   snapshot: AppSnapshot;
@@ -15,7 +17,11 @@ const phaseStep: Record<ExperimentPhase, typeof steps[number]> = {
   afterReady: 'comparison', completed: 'comparison', recoveryRequired: 'apply', rolledBack: 'comparison'
 };
 
-export function measurementWorkloadReference(afterMode: boolean, frozenReference: WorkloadReference | null, hashes: string[], newId: () => string = () => globalThis.crypto.randomUUID()): WorkloadReference | null {
+export function measurementWorkloadReference(afterMode: boolean, frozenReference: WorkloadReference | null, hashes: string[], newId: () => string = () => globalThis.crypto.randomUUID(), ownedReference: WorkloadReference | null = null): WorkloadReference | null {
+  if (ownedReference?.kind === 'owned' && (!afterMode || frozenReference?.kind === 'owned'
+    && frozenReference.id === ownedReference.id && frozenReference.hashes.length === ownedReference.hashes.length
+    && frozenReference.hashes.every((hash, index) => hash === ownedReference.hashes[index])))
+    return { ...ownedReference, hashes: [...ownedReference.hashes] };
   if (afterMode) return frozenReference?.kind === 'existing' ? { ...frozenReference, hashes: [...frozenReference.hashes] } : null;
   return { id: newId(), kind: 'existing', hashes: [...hashes] };
 }
@@ -30,31 +36,35 @@ export function ExperimentFlow({ snapshot, onStart, onCancel }: Props) {
   const [notice, setNotice] = useState('');
   const experiment = snapshot.experiment;
   const frozenReference = experiment?.workload?.reference ?? null;
+  const ownedSelected = frozenReference?.kind === 'owned';
+  const ownedReference = ownedMeasurementReference(snapshot);
   const frozenHashesText = frozenReference?.hashes.join(' ') ?? '';
   const parsedFrozenHashes = parseExistingHashes(frozenHashesText);
   const baselineValid = experiment?.baseline?.status === 'valid';
   const afterValid = experiment?.after?.status === 'valid';
   const afterMode = snapshot.applyStatus === 'verified';
-  const hasComparableExistingWorkload = frozenReference?.kind === 'existing' && parsedFrozenHashes.valid;
-  const hashes = afterMode ? parsedFrozenHashes : parseExistingHashes(hashText);
+  const hasComparableWorkload = ownedSelected ? ownedReference !== null : frozenReference?.kind === 'existing' && parsedFrozenHashes.valid;
+  const hashes = ownedSelected ? { valid: ownedReference !== null, hashes: ownedReference?.hashes ?? [] }
+    : afterMode ? parsedFrozenHashes : parseExistingHashes(hashText);
   const targetReady = snapshot.connection === 'validated' && snapshot.target !== null;
   const inputsReady = experiment?.runInputs !== null && experiment?.runInputs !== undefined;
   const operation = snapshot.activeOperation;
   const operationBusy = operation !== null;
-  const ready = targetReady && inputsReady && !operationBusy && !pending && hashes.valid;
-  const startDisabled = !ready || (afterMode ? !hasComparableExistingWorkload || !baselineValid || afterValid : baselineValid);
+  const stateBlocked = snapshot.phase === 'recoveryRequired' || snapshot.applyStatus === 'pending' || snapshot.applyStatus === 'unverified';
+  const ready = targetReady && inputsReady && !operationBusy && !pending && !stateBlocked && hashes.valid;
+  const startDisabled = !ready || (afterMode ? !hasComparableWorkload || !baselineValid || afterValid : baselineValid);
   const stageIndex = steps.indexOf(phaseStep[snapshot.phase]);
 
   const start = async () => {
     setSubmitted(true);
     setError('');
     setNotice('');
-    const selected = afterMode ? parsedFrozenHashes : parseExistingHashes(hashText);
-    if (!selected.valid || !targetReady || !inputsReady || operationBusy || pending
-      || (afterMode && (!hasComparableExistingWorkload || !baselineValid || afterValid)) || (!afterMode && baselineValid)) return;
+    const selected = hashes;
+    if (!selected.valid || !targetReady || !inputsReady || operationBusy || pending || stateBlocked
+      || (afterMode && (!hasComparableWorkload || !baselineValid || afterValid)) || (!afterMode && baselineValid)) return;
     setPending(true);
     try {
-      const workload = measurementWorkloadReference(afterMode, frozenReference, selected.hashes);
+      const workload = measurementWorkloadReference(afterMode, frozenReference, selected.hashes, undefined, ownedReference);
       if (workload) await onStart(workload);
     } catch {
       setError(t('experiment.startFailed'));
@@ -115,18 +125,22 @@ export function ExperimentFlow({ snapshot, onStart, onCancel }: Props) {
       </>}
     </section>}
 
-    <div className="field">
+    {ownedSelected ? <div className="field">
+      <p>{experiment?.workload?.name}</p>
+      <p>{translateOwnedAction(locale, ownedReference ? 'measurement' : 'unverified')}</p>
+      {ownedReference && <p><code>{ownedReference.hashes.join(' ')}</code></p>}
+    </div> : <div className="field">
       <label htmlFor="experiment-hashes">{t(afterMode ? 'experiment.afterHashes.label' : 'experiment.hashes.label')}</label>
       <textarea id="experiment-hashes" rows={4} value={afterMode ? frozenHashesText : hashText} onChange={event => setHashText(event.target.value)}
         readOnly={afterMode} aria-describedby="experiment-hashes-hint" aria-invalid={submitted && !hashes.valid} disabled={operationBusy || pending} />
       <p id="experiment-hashes-hint" className="field-hint">{t('experiment.hashes.hint')}</p>
       {(afterMode ? frozenHashesText : hashText).trim() && hashes.valid && <p>{t('experiment.hashes.count', { count: hashes.hashes.length })}</p>}
       {submitted && !hashes.valid && <p className="field-error" role="alert">{t('experiment.hashes.invalid')}</p>}
-    </div>
+    </div>}
 
     {afterMode && !baselineValid && <p role="status">{t('experiment.afterNeedsBaseline')}</p>}
     {afterMode && afterValid && <p role="status">{t('experiment.afterExists')}</p>}
-    {afterMode && !hasComparableExistingWorkload && <p role="status">{t('experiment.afterWorkloadMissing')}</p>}
+    {afterMode && !hasComparableWorkload && <p role="status">{t('experiment.afterWorkloadMissing')}</p>}
     {snapshot.phase === 'rolledBack' && <p role="status">{t('experiment.rolledBackNewCycle')}</p>}
     {!afterMode && baselineValid && snapshot.phase !== 'rolledBack' && <p role="status">{t('experiment.baselineExists')}</p>}
     {error && <p className="field-error" role="alert">{error}</p>}

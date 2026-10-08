@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { Authentication } from '../contracts/domain';
 import type { AppSnapshot } from '../contracts/protocol';
 import { sendCommand } from '../bridge/client';
@@ -13,10 +13,13 @@ export function ConnectionForm({ snapshot, onSnapshot, onError, onEndpointEdited
   const [username, setUsername] = useState('');
   const [secret, setSecret] = useState('');
   const [busy, setBusy] = useState(false);
+  const requestPending = useRef(false);
   const locked = busy || snapshot.activeOperation !== null;
   const t = (key: string) => translate(snapshot.preferences.locale, key);
   async function submit(disconnect = false) {
-    if (locked) { onError('errors.operationConflict'); return; }
+    if (disconnect && requestPending.current) return;
+    if (locked || requestPending.current) { onError('errors.operationConflict'); return; }
+    requestPending.current = true;
     setBusy(true); onError(null);
     const auth: Authentication = method === 'password' ? { kind: method, username, password: secret }
       : method === 'apiKey' ? { kind: method, apiKey: secret } : { kind: method };
@@ -30,7 +33,7 @@ export function ConnectionForm({ snapshot, onSnapshot, onError, onEndpointEdited
       // A failed reconnect invalidates the old target. Refresh authoritative state.
       try { onSnapshot(await sendCommand({ command: 'Initialize', payload: { protocolVersion: 1 } })); } catch { /* Keep the original actionable failure. */ }
       onError(key);
-    } finally { setBusy(false); }
+    } finally { requestPending.current = false; setBusy(false); }
   }
   return <section className="card"><h2>{t('connection.title')}</h2>
     {snapshot.target && <p>{snapshot.target.endpoint} · qBittorrent {snapshot.target.qbittorrentVersion} · API {snapshot.target.apiVersion} · libtorrent {snapshot.target.libtorrentVersion}</p>}

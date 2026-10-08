@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -9,11 +10,15 @@ using QFrey.Core.Qbittorrent;
 using QFrey.Core.Metrics;
 using QFrey.Core.Tuning;
 using QFrey.Core.Persistence;
+using QFrey.Desktop.Platform;
 
 namespace QFrey.Desktop.Bridge;
 public sealed partial class BridgeDispatcher(string dataRoot, Func<ConnectPayload, CancellationToken, Task<QbittorrentSession>>? connect = null,
     Func<string, Func<LiveMetric[]>>? localMetrics = null, TimeProvider? clock = null,
-    Func<string, Locale, CancellationToken, Task<string?>>? selectFile = null) : IDisposable
+    Func<string, Locale, CancellationToken, Task<string?>>? selectFile = null,
+    Func<string, bool, Func<CancellationToken, Task>, CancellationToken, Task<TargetLifecycleResult>>? runLifecycle = null,
+    Func<string, bool, ProcessOwnerObservation>? lifecycleOwner = null,
+    Func<CancellationToken, Task<NetworkProbeResult>>? runNetworkProbe = null) : IDisposable
 {
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     private readonly NativeFileSelections nativeSelections = new(clock);
@@ -72,7 +77,7 @@ public sealed partial class BridgeDispatcher(string dataRoot, Func<ConnectPayloa
         && string.IsNullOrEmpty(parsed.UserInfo) && parsed.AbsolutePath == "/index.html";
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly SemaphoreSlim commandAdmission = new(1, 1);
-    private readonly Dictionary<Guid, (string Command, string Reply)> completed = [];
+    private readonly ConcurrentDictionary<Guid, (string Command, string Reply)> completed = new();
     private readonly Queue<Guid> order = [];
     private UiPreferences preferences = new(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru" ? "ru-RU" : "en-US", ThemePreference.System);
     private long revision;
@@ -85,23 +90,29 @@ public sealed partial class BridgeDispatcher(string dataRoot, Func<ConnectPayloa
         try { command = Protocol.Parse(json); }
         catch (Exception error) when (error is JsonException or InvalidOperationException)
         { return Failure(Guid.Empty, "INVALID_COMMAND", "errors.invalidCommand"); }
-        if (command.Command is not ("Initialize" or "SetUiPreferences" or "Connect" or "Disconnect" or "BuildPlan" or "AcceptPlan" or "ListHistory" or "ReadCycle" or "StartMeasurement" or "CancelOperation" or "SelectNativeFile" or "ExportReport" or "RequestConfirmation" or "ApplyPlan" or "Rollback" or "RestoreLegacyBackup" or "KeepChanges" or "DetectLocalHardware" or "PrepareWorkload" or "StopOwnedWorkload" or "DeleteOwnedWorkload"))
+        if (command.Command is not ("Initialize" or "SetUiPreferences" or "Connect" or "Disconnect" or "BuildPlan" or "AcceptPlan" or "ListHistory" or "ReadCycle" or "StartMeasurement" or "CancelOperation" or "SelectNativeFile" or "ExportReport" or "RequestConfirmation" or "ApplyPlan" or "Rollback" or "RestoreLegacyBackup" or "KeepChanges" or "DetectLocalHardware" or "PrepareWorkload" or "StartOwnedWorkload" or "StopOwnedWorkload" or "DeleteOwnedWorkload" or "SelectOwnedWorkload" or "StopTarget" or "RestartTarget" or "RunNetworkTest"))
             return Failure(command.RequestId, "COMMAND_NOT_IMPLEMENTED", "errors.commandNotImplemented");
-        if (!await commandAdmission.WaitAsync(0, token)) return Failure(command.RequestId, "OPERATION_CONFLICT", "errors.operationConflict");
+        var payloadValue = CommandPayloads.Read(command);
+        var normalizedPayload = JsonSerializer.SerializeToElement(payloadValue, payloadValue.GetType(), Protocol.Json);
+        // Retain only a digest: a reconnect request contains credentials.
+        var canonical = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(command with { Payload = normalizedPayload }, Protocol.Json))));
+        if (!await commandAdmission.WaitAsync(0, token))
+        {
+            // Replays cannot wait for an operation that may itself await the caller's response.
+            if (completed.TryGetValue(command.RequestId, out var cached))
+                return cached.Command == canonical ? cached.Reply : Failure(command.RequestId, "DUPLICATE_REQUEST_CONFLICT", "errors.duplicateRequest");
+            return Failure(command.RequestId, "OPERATION_CONFLICT", "errors.operationConflict");
+        }
         var stateAcquired = false;
         try
         {
             // A brief telemetry publish is not a conflicting user operation.
             await gate.WaitAsync(token); stateAcquired = true;
             ObjectDisposedException.ThrowIf(disposed, this);
-            if (shuttingDown && command.Command is not ("Initialize" or "SetUiPreferences" or "ListHistory" or "ReadCycle"))
-                return Failure(command.RequestId, ErrorCodes.OperationConflict, "errors.operationConflict");
-            var payloadValue = CommandPayloads.Read(command);
-            var normalizedPayload = JsonSerializer.SerializeToElement(payloadValue, payloadValue.GetType(), Protocol.Json);
-            // Retain only a digest: a reconnect request contains credentials.
-            var canonical = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(command with { Payload = normalizedPayload }, Protocol.Json))));
             if (completed.TryGetValue(command.RequestId, out var previous))
                 return previous.Command == canonical ? previous.Reply : Failure(command.RequestId, "DUPLICATE_REQUEST_CONFLICT", "errors.duplicateRequest");
+            if (shuttingDown && command.Command is not ("Initialize" or "SetUiPreferences" or "ListHistory" or "ReadCycle"))
+                return Failure(command.RequestId, ErrorCodes.OperationConflict, "errors.operationConflict");
             if (activeOperation is not null && command.Command is ("Connect" or "Disconnect" or "BuildPlan" or "AcceptPlan" or "StartMeasurement"))
                 return Failure(command.RequestId, ErrorCodes.OperationConflict, "errors.operationConflict");
             if (!loaded)
@@ -123,9 +134,19 @@ public sealed partial class BridgeDispatcher(string dataRoot, Func<ConnectPayloa
             if (payloadValue is RequestConfirmationPayload confirmation)
                 return confirmation.ActionId == "RestoreLegacyBackup"
                     ? await RequestLegacyRestoreConfirmationAsync(command, confirmation, canonical, token).ConfigureAwait(false)
-                    : confirmation.ActionId is "PrepareWorkload" or "StopOwnedWorkload" or "DeleteOwnedWorkload"
+                    : confirmation.ActionId is "StopTarget" or "RestartTarget"
+                    ? await RequestLifecycleConfirmationAsync(command, confirmation, canonical, token).ConfigureAwait(false)
+                    : confirmation.ActionId == "RunNetworkTest"
+                    ? await RequestNetworkConfirmationAsync(command, confirmation, canonical, token).ConfigureAwait(false)
+                    : confirmation.ActionId is "PrepareWorkload" or "StartOwnedWorkload" or "StopOwnedWorkload" or "DeleteOwnedWorkload"
                     ? await RequestOwnedWorkloadConfirmationAsync(command, confirmation, canonical, token).ConfigureAwait(false)
                     : await RequestMutationConfirmationAsync(command, confirmation, canonical, token).ConfigureAwait(false);
+            if (payloadValue is LifecyclePayload lifecycle)
+                return await StartLifecycleAsync(command, lifecycle, canonical, token).ConfigureAwait(false);
+            if (payloadValue is NetworkTestPayload network)
+                return await StartNetworkTestAsync(command, network, canonical, token).ConfigureAwait(false);
+            if (payloadValue is SelectOwnedWorkloadPayload ownedSelection)
+                return await SelectOwnedWorkloadAsync(command, ownedSelection, canonical, token).ConfigureAwait(false);
             if (payloadValue is RestoreBackupPayload restore)
                 return await StartLegacyRestoreAsync(command, restore, canonical, token).ConfigureAwait(false);
             if (payloadValue is PrepareWorkloadPayload preparation)
@@ -190,6 +211,7 @@ public sealed partial class BridgeDispatcher(string dataRoot, Func<ConnectPayloa
                 session?.Dispose(); session = null; target = null; metrics = []; review = null; draft = null;
                 experiment = null; currentCycle = null; activeOperation = null; availableActions = []; selections = []; observedHardware = null;
                 pendingOwnedWorkloadId = null;
+                ownedWorkloadCandidates = []; networkTest = null;
                 completed.Clear(); order.Clear(); revision++;
                 if (command.Command == "Connect")
                 {
@@ -323,6 +345,7 @@ public sealed partial class BridgeDispatcher(string dataRoot, Func<ConnectPayloa
             ErrorCodes.ApplyUnverified => "errors.applyUnverified", ErrorCodes.RollbackConflict => "errors.rollbackConflict",
             ErrorCodes.RecoveryRequired => "errors.recoveryRequired", ErrorCodes.ConfirmationExpired => "errors.confirmationExpired",
             ErrorCodes.MeasurementInvalid => "errors.measurementInvalid",
+            ErrorCodes.OwnerUnavailable => "errors.ownerUnavailable",
             ErrorCodes.InvalidCommand => "errors.invalidCommand",
             "MEASUREMENT_CANCELLED" => "errors.operationCancelled",
             _ => "errors.apiUnavailable" };
@@ -338,6 +361,7 @@ public sealed partial class BridgeDispatcher(string dataRoot, Func<ConnectPayloa
             : session?.IsValidated == true ? ConnectionState.Validated : ConnectionState.Degraded, target,
             phase, currentCycle?.ApplyStatus ?? ApplyStatus.NotApplied, activeOperation, metrics, MutationActions())
         { Experiment = experiment ?? (draft is null ? null : new ExperimentSummary(null, draft, null, null, null, review?.Snapshot, [])), Confirmations = confirmations, Hardware = observedHardware, Restore = restorePreview,
+            NetworkTest = networkTest, OwnedWorkloadCandidates = ownedWorkloadCandidates,
             WorkloadCatalogue = QFrey.Core.Workloads.WorkloadCatalogue.Entries.Select(entry => new WorkloadCatalogueSummary(entry.Id,
                 entry.Label, entry.SizeBytes.ToString(CultureInfo.InvariantCulture), entry.SourceUrl)).ToArray() };
     }
@@ -356,10 +380,12 @@ public sealed partial class BridgeDispatcher(string dataRoot, Func<ConnectPayloa
         if (recoveryBlocked) throw new QbittorrentException(ErrorCodes.RecoveryRequired);
         if (currentCycle?.ApplyStatus is ApplyStatus.Pending or ApplyStatus.Unverified or ApplyStatus.Verified)
             throw new QbittorrentException(ErrorCodes.RecoveryRequired);
-        if (payload.Kind != MeasurementKind.Baseline || inputs is null || payload.Workload.Kind != WorkloadKind.Existing)
+        if (payload.Kind != MeasurementKind.Baseline || inputs is null || payload.Workload.Kind is not (WorkloadKind.Existing or WorkloadKind.Owned))
             return Failure(command.RequestId, ErrorCodes.MeasurementInvalid, "errors.measurementInvalid");
 
-        var workload = await currentSession.ReadExistingWorkloadAsync(payload.Workload, token).ConfigureAwait(false);
+        var workload = payload.Workload.Kind == WorkloadKind.Owned
+            ? await ResolveOwnedMeasurementAsync(payload.Workload, token).ConfigureAwait(false)
+            : await currentSession.ReadExistingWorkloadAsync(payload.Workload, token).ConfigureAwait(false);
         RevokeConfirmations();
         var operationId = Guid.NewGuid();
         var cycleId = Guid.NewGuid();
@@ -527,9 +553,9 @@ public sealed partial class BridgeDispatcher(string dataRoot, Func<ConnectPayloa
 
     private void Cache(Guid requestId, string canonical, string reply)
     {
-        completed.Add(requestId, (canonical, reply));
+        if (!completed.TryAdd(requestId, (canonical, reply))) throw new InvalidOperationException("DUPLICATE_REQUEST_CONFLICT");
         order.Enqueue(requestId);
-        while (order.Count > 256) completed.Remove(order.Dequeue());
+        while (order.Count > 256) completed.TryRemove(order.Dequeue(), out _);
     }
 
     private long NextEventSequence() => Interlocked.Increment(ref eventSequence) - 1;

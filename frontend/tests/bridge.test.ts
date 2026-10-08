@@ -24,6 +24,33 @@ async function bridge() {
 }
 const initialize: Command = { command: 'Initialize', payload: { protocolVersion: 1 } };
 
+test('only the accepted lifecycle operation can clear the active target through an event', async () => {
+  const h = host(); const client = await bridge();
+  const sessionId = '11111111-1111-1111-1111-111111111111';
+  const operationId = '22222222-2222-2222-2222-222222222222';
+  const snapshot: AppSnapshot = { ...initializeReply.data as AppSnapshot, revision: 1, connection: 'validated',
+    target: { sessionId, endpoint: 'http://localhost:8080/', qbittorrentVersion: '5.1.4', apiVersion: '2.11.4', libtorrentVersion: '2.0.11', isLocal: true } };
+  const initialized = client.sendCommand(initialize);
+  h.reply({ requestId: h.sent[0].requestId, ok: true, revision: 1, data: snapshot, error: null }); await initialized;
+  const listener = vi.fn(); client.subscribeSnapshots(listener);
+  const stopped = client.sendOperation({ command: 'StopTarget', payload: { confirmationToken: 'confirmed' } });
+  h.reply({ requestId: h.sent[1].requestId, ok: true, revision: 2, data: { operationId, revision: 2 }, error: null }); await stopped;
+  const terminal: AppSnapshot = { ...snapshot, revision: 3, connection: 'disconnected', target: null, activeOperation: null };
+  const event = { sessionId, operationId, revision: 3, sequence: 1, snapshot: terminal };
+  h.reply({ ...event, operationId: '33333333-3333-3333-3333-333333333333' });
+  h.reply({ ...event, sessionId: '33333333-3333-3333-3333-333333333333' });
+  h.reply({ ...event, snapshot: { ...terminal, activeOperation: { id: operationId, kind: 'stopTarget', stage: 'starting', progress: null, cancellable: false } } });
+  expect(listener).not.toHaveBeenCalled();
+  h.reply(event);
+  expect(listener).toHaveBeenCalledTimes(1);
+  expect(listener).toHaveBeenCalledWith(terminal);
+  h.reply(event); expect(listener).toHaveBeenCalledTimes(1);
+  const reconnect = client.sendCommand({ command: 'Connect', payload: { endpoint: 'http://localhost:8080/', auth: { kind: 'bypass' } } });
+  expect(h.sent[2].targetSessionId).toBeNull();
+  expect(h.sent[2].expectedRevision).toBe(3);
+  h.reply({ requestId: h.sent[2].requestId, ok: true, revision: 4, data: { ...snapshot, revision: 4 }, error: null }); await reconnect;
+});
+
 test('history responses use their own validator and preserve the active target revision', async () => {
   const h = host(); const client = await bridge();
   const initialized = client.sendCommand(initialize);

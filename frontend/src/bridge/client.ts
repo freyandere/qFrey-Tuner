@@ -1,7 +1,7 @@
 import type { AppError, AppSnapshot, Command, Reply, Request } from '../contracts/protocol';
 import type { ProductCommand, HistoryPage, ExperimentSummary, AcceptedOperation, NativeSelection } from '../contracts/domain';
 import { en } from '../i18n/messages';
-import { experiment, confirmation, finite, uuid, timestamp, acceptedOperation, metricReading, hardware, networkTest } from '../contracts/validation';
+import { experiment, confirmation, finite, uuid, timestamp, acceptedOperation, metricReading, hardware, networkTest, workloadSummary } from '../contracts/validation';
 interface WebView { postMessage(message: Request): void; addEventListener(type: 'message', handler: (event: MessageEvent<unknown>) => void): void }
 declare global { interface Window { chrome?: { webview?: WebView } } }
 const pending = new Map<string, { resolve: (data: unknown) => void; validate: (data: unknown, revision: number) => boolean; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
@@ -10,6 +10,7 @@ let listening = false;
 let initialized = false;
 let sessionId: string | null = null;
 let sequence = -1;
+let lifecycleOperationId: string | null = null;
 const subscribers = new Set<(snapshot: AppSnapshot) => void>();
 
 export function subscribeSnapshots(listener: (snapshot: AppSnapshot) => void): () => void {
@@ -40,6 +41,11 @@ export function isSnapshot(value: unknown, replyRevision: number): value is AppS
   if (value.confirmations !== undefined && (!Array.isArray(value.confirmations) || value.confirmations.length > 32 || !value.confirmations.every(confirmation))) return false;
   if (value.hardware !== undefined && value.hardware !== null && !hardware(value.hardware)) return false;
   if (value.networkTest !== undefined && value.networkTest !== null && !networkTest(value.networkTest)) return false;
+  if (value.ownedWorkloadCandidates !== undefined && value.ownedWorkloadCandidates !== null
+    && (!Array.isArray(value.ownedWorkloadCandidates) || value.ownedWorkloadCandidates.length > 128
+      || !value.ownedWorkloadCandidates.every(w => workloadSummary(w) && isRecord(w) && isRecord(w.reference)
+        && w.reference.kind === 'owned' && Array.isArray(w.reference.hashes) && w.reference.hashes.length === 1)
+      || new Set(value.ownedWorkloadCandidates.map(w => (w as { reference: { id: string } }).reference.id.toLowerCase())).size !== value.ownedWorkloadCandidates.length)) return false;
   if (value.interfaces !== undefined && (!Array.isArray(value.interfaces) || value.interfaces.length > 128
     || !value.interfaces.every(i => isRecord(i) && isString(i.id) && isString(i.name)))) return false;
   if (value.workloadCatalogue !== undefined && (!Array.isArray(value.workloadCatalogue) || value.workloadCatalogue.length > 16
@@ -73,7 +79,7 @@ export function isSnapshot(value: unknown, replyRevision: number): value is AppS
     || !isString(value.target.qbittorrentVersion) || !isString(value.target.apiVersion) || !isString(value.target.libtorrentVersion)
     || typeof value.target.isLocal !== 'boolean')) return false;
   if (value.activeOperation !== null && (!isRecord(value.activeOperation) || !uuid(value.activeOperation.id)
-    || !isOneOf(value.activeOperation.kind, ['networkTest', 'hardwareDetection', 'measurement', 'prepareWorkload', 'stopWorkload', 'deleteWorkload', 'apply', 'rollback', 'restore', 'startTarget', 'stopTarget', 'restartTarget']) || !isString(value.activeOperation.stage)
+    || !isOneOf(value.activeOperation.kind, ['networkTest', 'hardwareDetection', 'measurement', 'prepareWorkload', 'stopWorkload', 'deleteWorkload', 'apply', 'rollback', 'restore', 'startTarget', 'stopTarget', 'restartTarget', 'startWorkload']) || !isString(value.activeOperation.stage)
     || (value.activeOperation.progress !== null && (!isFiniteNumber(value.activeOperation.progress) || value.activeOperation.progress < 0 || value.activeOperation.progress > 100))
     || typeof value.activeOperation.cancellable !== 'boolean')) return false;
 
@@ -103,7 +109,7 @@ function errorKey(error: Reply['error']): string {
   return error && Object.hasOwn(en, error.messageKey) && error.messageKey.startsWith('errors.') ? error.messageKey : 'errors.unknown';
 }
 
-export function sendCommand(command: Command | Extract<ProductCommand, { command: 'Connect' | 'Disconnect' | 'BuildPlan' | 'AcceptPlan' | 'CancelOperation' | 'ExportReport' | 'RequestConfirmation' | 'KeepChanges' }>): Promise<AppSnapshot> {
+export function sendCommand(command: Command | Extract<ProductCommand, { command: 'Connect' | 'Disconnect' | 'BuildPlan' | 'AcceptPlan' | 'CancelOperation' | 'ExportReport' | 'RequestConfirmation' | 'KeepChanges' | 'SelectOwnedWorkload' }>): Promise<AppSnapshot> {
   return sendRequest(command, isSnapshot);
 }
 export function isHistoryPage(value: unknown): value is HistoryPage {
@@ -119,8 +125,12 @@ export const selectNativeFile = (purpose: NativeSelection['purpose']): Promise<N
   sendRequest({ command: 'SelectNativeFile', payload: { purpose } }, (value): value is NativeSelection | null => value === null
     || isRecord(value) && value.purpose === purpose && typeof value.token === 'string' && /^[A-F0-9]{64}$/.test(value.token)
       && typeof value.displayName === 'string' && value.displayName.length <= 256 && timestamp(value.expiresUtc));
-export const sendOperation = (command: Extract<ProductCommand, { command: 'StartMeasurement' | 'ApplyPlan' | 'Rollback' | 'RestoreLegacyBackup' | 'PrepareWorkload' | 'DetectLocalHardware' }>): Promise<AcceptedOperation> =>
-  sendRequest(command, (value, replyRevision): value is AcceptedOperation => acceptedOperation(value) && value.revision === replyRevision);
+export const sendOperation = (command: Extract<ProductCommand, { command: 'StartMeasurement' | 'ApplyPlan' | 'Rollback' | 'RestoreLegacyBackup' | 'PrepareWorkload' | 'DetectLocalHardware' | 'StartOwnedWorkload' | 'StopOwnedWorkload' | 'RunNetworkTest' | 'StopTarget' | 'RestartTarget' }>): Promise<AcceptedOperation> =>
+  sendRequest(command, (value, replyRevision): value is AcceptedOperation => {
+    if (!acceptedOperation(value) || value.revision !== replyRevision) return false;
+    if (sessionId !== null && (command.command === 'StopTarget' || command.command === 'RestartTarget')) lifecycleOperationId = value.operationId;
+    return true;
+  });
 
 function sendRequest<T>(command: Command | ProductCommand, validate: (data: unknown, revision: number) => data is T): Promise<T> {
   const webview = window.chrome?.webview;
@@ -132,9 +142,14 @@ function sendRequest<T>(command: Command | ProductCommand, validate: (data: unkn
       if (typeof value.requestId !== 'string') {
         if (!initialized || value.sessionId !== sessionId || !(value.operationId === null || uuid(value.operationId))
           || !isSafeRevision(value.sequence) || value.sequence <= sequence || !isSafeRevision(value.revision)
-          || revision === null || value.revision < revision || !isSnapshot(value.snapshot, value.revision)
-          || (value.snapshot.target?.sessionId ?? null) !== sessionId) return;
+          || revision === null || value.revision < revision || !isSnapshot(value.snapshot, value.revision)) return;
+        const terminalLifecycle = sessionId !== null && value.operationId === lifecycleOperationId && lifecycleOperationId !== null
+          && value.snapshot.target === null && value.snapshot.activeOperation === null;
+        if ((value.snapshot.target?.sessionId ?? null) !== sessionId && !terminalLifecycle) return;
+        if (value.snapshot.activeOperation?.kind === 'stopTarget' || value.snapshot.activeOperation?.kind === 'restartTarget')
+          lifecycleOperationId = value.snapshot.activeOperation.id;
         sequence = value.sequence; revision = value.revision;
+        if (terminalLifecycle) { sessionId = null; lifecycleOperationId = null; sequence = -1; }
         for (const listener of subscribers) listener(value.snapshot);
         return;
       }
@@ -153,7 +168,7 @@ function sendRequest<T>(command: Command | ProductCommand, validate: (data: unkn
       revision = Math.max(revision ?? 0, reply.revision);
       if (snapshotReply) {
         const newSession = reply.data.target?.sessionId ?? null;
-        if (newSession !== sessionId) sequence = -1;
+        if (newSession !== sessionId) { sequence = -1; lifecycleOperationId = null; }
         sessionId = newSession; initialized = true;
       }
       item.resolve(reply.data);

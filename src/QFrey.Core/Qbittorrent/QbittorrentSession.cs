@@ -249,7 +249,7 @@ public sealed partial class QbittorrentSession : IDisposable
     }
 
     private async Task<(HttpStatusCode Status, byte[] Bytes)> SendAsync(HttpMethod method, string path, HttpContent? content,
-        CancellationToken token, bool allowAuthenticationFailure = false)
+        CancellationToken token, bool allowAuthenticationFailure = false, Action? beforeSend = null)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         if (Interlocked.Increment(ref pendingRequests) > 16)
@@ -264,6 +264,8 @@ public sealed partial class QbittorrentSession : IDisposable
             acquired = true;
             clock.Start(); // API round trip, excluding time waiting in the local queue.
             using var request = new HttpRequestMessage(method, path) { Content = content };
+            beforeSend?.Invoke();
+            deadline.Token.ThrowIfCancellationRequested();
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token).ConfigureAwait(false);
             if ((int)response.StatusCode is >= 300 and < 400) throw new QbittorrentException(ErrorCodes.RedirectRejected);
             if (!response.IsSuccessStatusCode && !(allowAuthenticationFailure && response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden))

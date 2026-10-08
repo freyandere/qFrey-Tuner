@@ -1,5 +1,17 @@
 # Migration execution progress
 
+## Paused by user — 2026-10-08
+
+This supersedes active assignments below. User explicitly paused until a later continuation. No automatic implementation/test restart or packaging. UI is NOT accepted: repeated headings, unseparated control groups, filter/card rhythm and enum values suffixed with count need correction. Russian Experiment repetition/status/action grouping needs reproduction. Full report and next actions: [UI checkpoint](ui-checkpoint-2026-10-08-ru.md); [spacing audit](ui-audit-2026-10-08.md).
+
+Today's source integrates owned Start/Stop verified state readback and GET-only lost-response recovery (write authority stays revoked), explicit multiple-journal selection, owned baseline/apply/after checks, graceful lifecycle consent/pre-POST exact owner checks, consented network testing with idle monitor/final evidence and nullable unknown rates, C#/TS contracts and UI. Delete without server path safety proof remains denied.
+
+Checks: Python160/backend667/frontend122 passed, frontend typecheck passed; Desktop0warnings/errors. Actual C# payload and Python upstream checkers passed five pinned tags × LT1/LT2. Browser evidence includes144before+144after screenshots,8contacts,48pairs; overflow/focus/retention/CTA checks pass but semantic visual acceptance FAILED. Normal Rollup tree shaking stalls; temporary disabled-tree-shaking minified build389ms passed. Playwright CLI discovery hangs; attempts interrupted, E2E gate unpassed.
+
+WebView load intentionally stopped at210samples/1045.005sec (~17m25s), partial-user-paused, NOT30minute/G5 pass. Exact owned host13660 closed gracefully and exited; runner2676 exited. Previous full attempt was contaminated by pytest parent-temp cleanup, also not a pass. Pytest default basetemp corrected to .cache/tests/pytest. QA browsers and root preview closed.
+
+No new candidate today: staging SHA266fd2028c42fb7f043e6676f7bee696ee549b8fb9eefea5fa6235304102f08c predates these changes; release SHAfb9cc05ec9bd8bdcf34c30d1a652412b257bad672a21ee9c8a5d73dd92a31040 unchanged. Branch codex/dotnet-webview2, draft PR2, G2–G5 incomplete. Resume first with semantic UI hierarchy/spacing/current actions, then browser/build/native/real-client acceptance. Do not automatically resume or publish.
+
 ## Authoritative continuation — 2026-10-08
 
 This entry supersedes earlier active assignments and checkpoint counts. Migration remains incomplete; G2–G5 have not passed. Source work is on `codex/dotnet-webview2`; ordinary qBittorrent profiles and the current release remain untouched.

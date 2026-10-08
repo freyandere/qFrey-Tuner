@@ -1,0 +1,71 @@
+import type { Locale } from '../contracts/protocol';
+
+export const enNetworkMessages = {
+  'network.title': 'Network speed test',
+  'network.scope': 'Measures the internet connection of this Windows computer, including its current route or VPN. It does not measure a remote qBittorrent server or torrent throughput.',
+  'network.traffic': 'This test sends public HTTPS requests to Cloudflare, Microsoft Azure and Google Cloud. Maximum payload traffic: 220 MiB (160 MiB download + 60 MiB upload), up to 17 requests. Protocol overhead is additional. Data charges may apply.',
+  'network.review': 'Review network test',
+  'network.confirmTitle': 'Authorize network traffic',
+  'network.run': 'Run network test',
+  'network.cancel': 'Cancel',
+  'network.use': 'Use measured values in draft',
+  'network.useHint': 'Copies only available positive readings into the draft. Review them before building a plan.',
+  'network.unavailable': 'Connect to a validated target and finish other operations or recovery before running a test.',
+  'network.noResult': 'No network test result yet.',
+  'network.running': 'Measuring network speed…',
+  'network.download': 'Download',
+  'network.upload': 'Upload',
+  'network.unknown': 'Not measured',
+  'network.measured': 'Measured {time}',
+  'network.expires': 'Authorization expires at {time}.',
+  'network.stale': 'Authorization is expired or no longer matches this target. Review the test again.',
+  'network.failed': 'The network operation failed. Review the test again to retry.',
+  'network.reason.generic': 'Some readings are unavailable. Check the connection and retry if needed.',
+  'network.reason.NETWORK_SERVER_UNAVAILABLE': 'No test server could be reached.',
+  'network.reason.UPLOAD_UNSUPPORTED': 'The test server cannot measure upload speed.',
+  'network.reason.NETWORK_REDIRECT_REJECTED': 'The test server redirected the request; the test rejected it.',
+  'network.reason.NETWORK_HTTP_ERROR': 'A test server request failed. Check connectivity or VPN restrictions.',
+  'network.reason.NETWORK_READ_ERROR': 'The download stream could not be read.',
+  'network.reason.NETWORK_TIMEOUT': 'A test server request timed out.',
+  'network.reason.NETWORK_NO_BYTES': 'No payload was transferred; speed is unknown.',
+  'network.reason.NETWORK_DURATION_TOO_SHORT': 'The transfer was too short for a reliable reading.',
+  'network.reason.NETWORK_RATE_INVALID': 'The test returned an invalid speed.',
+} as const;
+
+export const ruNetworkMessages: Record<keyof typeof enNetworkMessages, string> = {
+  'network.title': 'Тест скорости сети',
+  'network.scope': 'Измеряется интернет-соединение этого компьютера с Windows с учётом текущего маршрута или VPN. Это не скорость удалённого сервера qBittorrent и не скорость торрента.',
+  'network.traffic': 'Тест отправляет публичные HTTPS-запросы Cloudflare, Microsoft Azure и Google Cloud. Максимальный трафик полезных данных: 220 MiB (160 MiB загрузка + 60 MiB отдача), до 17 запросов. Служебный трафик добавляется отдельно. Возможна плата за трафик.',
+  'network.review': 'Проверить условия теста сети',
+  'network.confirmTitle': 'Разрешить сетевой трафик',
+  'network.run': 'Запустить тест сети',
+  'network.cancel': 'Отмена',
+  'network.use': 'Перенести измеренные значения в черновик',
+  'network.useHint': 'В черновик копируются только доступные положительные показания. Проверьте их перед построением плана.',
+  'network.unavailable': 'Подключитесь к проверенной цели и завершите другие операции или восстановление перед тестом.',
+  'network.noResult': 'Результатов теста сети пока нет.',
+  'network.running': 'Измеряется скорость сети…',
+  'network.download': 'Загрузка',
+  'network.upload': 'Отдача',
+  'network.unknown': 'Не измерено',
+  'network.measured': 'Измерено: {time}',
+  'network.expires': 'Разрешение действует до {time}.',
+  'network.stale': 'Разрешение истекло или больше не соответствует цели. Проверьте условия теста снова.',
+  'network.failed': 'Не удалось выполнить сетевую операцию. Для повторной попытки проверьте условия теста снова.',
+  'network.reason.generic': 'Некоторые показания недоступны. Проверьте соединение и при необходимости повторите тест.',
+  'network.reason.NETWORK_SERVER_UNAVAILABLE': 'Нет доступного сервера теста.',
+  'network.reason.UPLOAD_UNSUPPORTED': 'Сервер теста не поддерживает измерение отдачи.',
+  'network.reason.NETWORK_REDIRECT_REJECTED': 'Сервер перенаправил запрос; тест отклонил перенаправление.',
+  'network.reason.NETWORK_HTTP_ERROR': 'Ошибка запроса к серверу теста. Проверьте соединение или ограничения VPN.',
+  'network.reason.NETWORK_READ_ERROR': 'Не удалось прочитать поток загрузки.',
+  'network.reason.NETWORK_TIMEOUT': 'Истекло время ожидания сервера теста.',
+  'network.reason.NETWORK_NO_BYTES': 'Данные не переданы; скорость неизвестна.',
+  'network.reason.NETWORK_DURATION_TOO_SHORT': 'Передача слишком короткая для достоверного измерения.',
+  'network.reason.NETWORK_RATE_INVALID': 'Тест вернул неверную скорость.',
+};
+
+export function translateNetwork(locale: Locale, key: string, parameters: Readonly<Record<string, string | number>> = {}): string {
+  const messages = locale === 'ru-RU' ? ruNetworkMessages : enNetworkMessages;
+  const template = Object.hasOwn(messages, key) ? messages[key as keyof typeof enNetworkMessages] : messages['network.reason.generic'];
+  return template.replace(/\{(\w+)\}/g, (_match, name: string) => String(parameters[name] ?? '—'));
+}

@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using QFrey.Core.Contracts;
+using QFrey.Core.Metrics;
 using QFrey.Core.Workloads;
 
 namespace QFrey.Core.Qbittorrent;
@@ -17,8 +18,18 @@ public sealed partial class QbittorrentSession
     /// <summary>Fresh, bounded read-only inventory for ownership recovery. It never grants write authority.</summary>
     internal async Task<WorkloadInventoryEvidence> ReadRecoveryOwnedWorkloadInventoryAsync(CancellationToken token)
     {
-        await RevalidateVersionsAsync(token).ConfigureAwait(false);
-        return await ReadOwnedWorkloadInventoryCoreAsync(token).ConfigureAwait(false);
+        await RevalidateVersionsCoreAsync(token).ConfigureAwait(false);
+        return await ReadOwnedWorkloadInventoryCoreAsync(token, recoveryRead: true).ConfigureAwait(false);
+    }
+
+    /// <summary>Readback after uncertain writes; exact saved versions are checked without restoring write authority.</summary>
+    internal async Task<TorrentTelemetryEvidence> ReadRecoveryOwnedWorkloadMetricsAsync(
+        IReadOnlyCollection<string> selectedHashes, CancellationToken token)
+    {
+        await RevalidateVersionsCoreAsync(token).ConfigureAwait(false);
+        var response = await SendAsync(HttpMethod.Get, "torrents/info", null, token).ConfigureAwait(false);
+        using var document = Parse(response.Bytes);
+        return TorrentTelemetry.Aggregate(document.RootElement, selectedHashes, time.GetUtcNow());
     }
 
     /// <summary>
@@ -122,9 +133,10 @@ public sealed partial class QbittorrentSession
         await SendAsync(HttpMethod.Post, path, request, token).ConfigureAwait(false);
     }
 
-    private async Task<WorkloadInventoryEvidence> ReadOwnedWorkloadInventoryCoreAsync(CancellationToken token)
+    private async Task<WorkloadInventoryEvidence> ReadOwnedWorkloadInventoryCoreAsync(CancellationToken token,
+        bool recoveryRead = false)
     {
-        if (!IsValidated) throw new QbittorrentException(ErrorCodes.TargetNotValidated);
+        if (!recoveryRead && !IsValidated) throw new QbittorrentException(ErrorCodes.TargetNotValidated);
         var response = await SendAsync(HttpMethod.Get, "torrents/info", null, token).ConfigureAwait(false);
         using var document = Parse(response.Bytes);
         var root = document.RootElement;

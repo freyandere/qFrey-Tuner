@@ -9,7 +9,16 @@ import { enHardwareMessages, ruHardwareMessages } from '../components/hardwareMe
 import { enRecommendationReviewMessages, ruRecommendationReviewMessages } from './recommendationReviewMessages';
 import { enWorkloadMessages, ruWorkloadMessages } from '../components/workloadMessages';
 import { enRestoreMessages, ruRestoreMessages } from '../components/restoreMessages';
+import { enOwnedActionMessages, ruOwnedActionMessages } from '../components/ownedActionMessages';
+import { enLifecycleMessages, ruLifecycleMessages } from '../components/lifecycleMessages';
 export const en = {
+  'navigation.setup': 'Go to setup and build a plan',
+  'navigation.experiment': 'Go to the experiment',
+  'navigation.history': 'Browse saved experiments',
+  'confirmation.workload.start': enOwnedActionMessages['confirmation.workload.start'],
+  'confirmation.lifecycle.stop': enLifecycleMessages['confirmation.lifecycle.stop'],
+  'confirmation.lifecycle.restart': enLifecycleMessages['confirmation.lifecycle.restart'],
+  'network.confirmTraffic': 'Test this Windows computer’s internet connection using public HTTPS requests? Maximum payload traffic: {maxPayloadMiB} MiB in up to {maxRequests} requests, plus protocol overhead. Data charges may apply.',
   'confirmations.restoreLegacy': 'Restore the reviewed original settings on {endpoint}? A separate backup of the current values will be saved first.',
   'restore.completed': 'Original settings restored and verified by readback. Previous experiment results remain in history.',
   ...enRestoreMessages,
@@ -78,7 +87,7 @@ export const en = {
   'errors.backupInvalid': 'This backup is damaged, incompatible or from an unsupported format version.',
   'errors.workloadNotOwned': 'Ownership of this test torrent could not be verified. It cannot be stopped or deleted here.',
   'errors.metadataInvalid': 'The torrent metadata failed its size, format, source or hash checks.',
-  'errors.ownerUnavailable': 'The local qBittorrent process could not be identified reliably. Enter hardware details manually.',
+  'errors.ownerUnavailable': 'The local qBittorrent process could not be verified. Local process operations are unavailable.',
   'errors.measurementInvalid': 'This measurement is invalid. Review its reasons and repeat it under comparable conditions.',
   'errors.cancelled': 'The operation was cancelled.',
   'metrics.stale': 'Data is stale · {seconds} s ago',
@@ -122,6 +131,13 @@ export const en = {
 } as const;
 export type TranslationKey = keyof typeof en;
 export const ru: Record<TranslationKey, string> = {
+  'navigation.setup': 'Перейти к условиям и построить план',
+  'navigation.experiment': 'Перейти к эксперименту',
+  'navigation.history': 'Открыть сохранённые эксперименты',
+  'confirmation.workload.start': ruOwnedActionMessages['confirmation.workload.start'],
+  'confirmation.lifecycle.stop': ruLifecycleMessages['confirmation.lifecycle.stop'],
+  'confirmation.lifecycle.restart': ruLifecycleMessages['confirmation.lifecycle.restart'],
+  'network.confirmTraffic': 'Проверить интернет-соединение этого компьютера с Windows публичными HTTPS-запросами? Максимальный трафик данных: {maxPayloadMiB} MiB, до {maxRequests} запросов, плюс служебный трафик. Возможна плата за трафик.',
   'confirmations.restoreLegacy': 'Восстановить проверенные исходные настройки на {endpoint}? Сначала будет сохранена отдельная копия текущих значений.',
   'restore.completed': 'Исходные настройки восстановлены и проверены повторным чтением. Результаты прежних экспериментов сохранены в истории.',
   ...ruRestoreMessages,
@@ -190,7 +206,7 @@ export const ru: Record<TranslationKey, string> = {
   'errors.backupInvalid': 'Резервная копия повреждена, несовместима или использует неподдерживаемую версию формата.',
   'errors.workloadNotOwned': 'Не удалось подтвердить владение тестовым торрентом. Здесь нельзя остановить или удалить его.',
   'errors.metadataInvalid': 'Метаданные торрента не прошли проверку размера, формата, источника или хеша.',
-  'errors.ownerUnavailable': 'Не удалось надёжно определить локальный процесс qBittorrent. Введите характеристики вручную.',
+  'errors.ownerUnavailable': 'Не удалось проверить локальный процесс qBittorrent. Операции с локальным процессом недоступны.',
   'errors.measurementInvalid': 'Замер недостоверен. Проверьте причины и повторите его в сопоставимых условиях.',
   'errors.cancelled': 'Операция отменена.',
   'metrics.stale': 'Данные устарели · {seconds} с назад',

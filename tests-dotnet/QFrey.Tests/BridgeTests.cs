@@ -31,6 +31,56 @@ public class BridgeTests
         Assert.False(Directory.Exists(root));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CachedReplyRemainsReplayableWhileAnotherCommandHoldsAdmission(bool holdStateGate)
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../tests-dotnet", Guid.NewGuid().ToString("N")));
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var dispatcher = new BridgeDispatcher(root, selectFile: async (_, _, _) =>
+        {
+            entered.SetResult();
+            await release.Task;
+            return null;
+        });
+        string Request(Guid id, string name, object payload) => JsonSerializer.Serialize(new
+        {
+            protocolVersion = 1, requestId = id, command = name,
+            targetSessionId = (Guid?)null, expectedRevision = (long?)0, payload
+        }, Protocol.Json);
+        Task<string>? selecting = null;
+        SemaphoreSlim? heldGate = null;
+        try
+        {
+            var id = Guid.NewGuid();
+            var request = Request(id, "SetUiPreferences", new { locale = "ru-RU", theme = "dark" });
+            var accepted = await dispatcher.DispatchAsync(request, default);
+            selecting = dispatcher.DispatchAsync(Request(Guid.NewGuid(), "SelectNativeFile", new { purpose = "volume" }), default);
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            if (holdStateGate)
+            {
+                // Model a worker paused in I/O while both admission and state are unavailable.
+                heldGate = (SemaphoreSlim)typeof(BridgeDispatcher).GetField("gate",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(dispatcher)!;
+                await heldGate.WaitAsync();
+            }
+            Assert.Equal(accepted, await dispatcher.DispatchAsync(request, default).WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.Contains("DUPLICATE_REQUEST_CONFLICT", await dispatcher.DispatchAsync(
+                Request(id, "SetUiPreferences", new { locale = "ru-RU", theme = "light" }), default).WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.Contains("OPERATION_CONFLICT", await dispatcher.DispatchAsync(
+                Request(Guid.NewGuid(), "SetUiPreferences", new { locale = "ru-RU", theme = "light" }), default).WaitAsync(TimeSpan.FromSeconds(5)));
+        }
+        finally
+        {
+            heldGate?.Release();
+            release.TrySetResult();
+            if (selecting is not null) await selecting;
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
     [Fact]
     public async Task DuplicatePreferencesAreIdempotentAndStaleCommandsDoNotWrite()
     {

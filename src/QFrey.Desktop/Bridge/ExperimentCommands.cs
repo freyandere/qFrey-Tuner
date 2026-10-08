@@ -7,7 +7,8 @@ namespace QFrey.Desktop.Bridge;
 
 internal static class ExperimentCommands
 {
-    public static async Task ValidateBaselineAsync(CycleRecord cycle, QbittorrentSession session, CancellationToken token)
+    public static async Task ValidateBaselineAsync(CycleRecord cycle, QbittorrentSession session, CancellationToken token,
+        Func<WorkloadReference, CancellationToken, Task>? validateOwned = null)
     {
         ArgumentNullException.ThrowIfNull(cycle);
         ArgumentNullException.ThrowIfNull(session);
@@ -29,11 +30,16 @@ internal static class ExperimentCommands
         if (summary is null || summary.Id == Guid.Empty || summary.Kind != MeasurementKind.Baseline || summary.Status != MeasurementStatus.Valid
             || summary.AnalysisVersion != MeasurementAnalysis.Version
             || !validSamples
-            || context is null || reference is null || reference.Kind != WorkloadKind.Existing || reference.Id == Guid.Empty
+            || context is null || reference is null || reference.Kind is not (WorkloadKind.Existing or WorkloadKind.Owned)
+            || reference.Kind == WorkloadKind.Owned && (validateOwned is null || workload!.OwnershipVerified != true)
+            || reference.Id == Guid.Empty
             || reference.Hashes is not { Length: > 0 and <= 5000 }
             || reference.Hashes.Any(hash => hash is not { Length: 40 } || !hash.All(Uri.IsHexDigit))
             || reference.Hashes.Distinct(StringComparer.OrdinalIgnoreCase).Count() != reference.Hashes.Length)
             throw new QbittorrentException(ErrorCodes.BaselineRequired);
+
+        if (reference.Kind == WorkloadKind.Owned)
+            await validateOwned!(reference, token).ConfigureAwait(false);
 
         var selected = context.SelectedTorrents;
         var active = context.ActiveHashes;

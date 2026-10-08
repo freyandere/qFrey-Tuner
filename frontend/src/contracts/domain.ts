@@ -77,7 +77,7 @@ export interface AcceptedOperation { operationId: string; revision: number }
 export interface ObservedHardware { inputs: DraftInputs['hardware'] | null; facts: HardwareFacts; reasonCodes: string[] }
 export interface HardwareFacts { ramBytes: MetricReading; logicalCpuCount: MetricReading; performanceCpuCount: MetricReading; storageType: DraftInputs['hardware']['storageType'] | null; storageReasonCode: string | null; volumeToken: string | null }
 export interface TargetInterface { id: string; name: string }
-export interface NetworkTestResult { downloadBytesPerSecond: number; uploadBytesPerSecond: number; measuredUtc: string; reasonCodes: string[] }
+export interface NetworkTestResult { downloadBytesPerSecond: number | null; uploadBytesPerSecond: number | null; measuredUtc: string; reasonCodes: string[] }
 export type Authentication = { kind: 'bypass' } | { kind: 'password'; username: string; password: string } | { kind: 'apiKey'; apiKey: string };
 export type ProductCommand =
   | { command: 'Connect'; payload: { endpoint: string; auth: Authentication } }
@@ -90,6 +90,8 @@ export type ProductCommand =
   | { command: 'CancelOperation'; payload: { operationId: string } }
   | { command: 'PrepareWorkload'; payload: { catalogueId: string; serverSavePath: string; approvalToken: string } }
   | { command: 'StopOwnedWorkload'; payload: { workloadId: string; confirmationToken: string } }
+  | { command: 'StartOwnedWorkload'; payload: { workloadId: string; confirmationToken: string } }
+  | { command: 'SelectOwnedWorkload'; payload: { workloadId: string } }
   | { command: 'DeleteOwnedWorkload'; payload: { workloadId: string; deleteFiles: boolean; confirmationToken: string } }
   | { command: 'ApplyPlan'; payload: { planId: string; expectedRevision: number; confirmationToken: string } }
   | { command: 'Rollback'; payload: { cycleId: string; expectedRevision: number; confirmationToken: string } }
@@ -98,6 +100,8 @@ export type ProductCommand =
   | { command: 'ListHistory'; payload: { cursor: string | null; pageSize: number } }
   | { command: 'ReadCycle'; payload: { cycleId: string } }
   | { command: 'ExportReport'; payload: { cycleId: string; format: 'json' | 'html'; destinationToken: string; locale: Locale } }
-  | { command: 'StartTarget' | 'StopTarget' | 'RestartTarget'; payload: { confirmationToken: string } }
+  | { command: 'StartTarget'; payload: { confirmationToken: string } }
+  | { command: 'StopTarget'; payload: { confirmationToken: string } }
+  | { command: 'RestartTarget'; payload: { confirmationToken: string } }
   | { command: 'RequestConfirmation'; payload: { actionId: string; planId: string | null; cycleId: string | null; workloadId: string | null; catalogueId?: string | null; serverSavePath?: string | null; selectionToken?: string | null } }
   | { command: 'SelectNativeFile'; payload: { purpose: 'restore' | 'exportJson' | 'exportHtml' | 'volume' } };

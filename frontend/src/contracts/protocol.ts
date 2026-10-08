@@ -1,4 +1,4 @@
-import type { ConfirmationSummary, ExperimentSummary, ProductCommand, ObservedHardware, NetworkTestResult, TargetInterface } from './domain';
+import type { ConfirmationSummary, ExperimentSummary, ProductCommand, ObservedHardware, NetworkTestResult, TargetInterface, WorkloadSummary } from './domain';
 export type Locale = 'ru-RU' | 'en-US';
 export type ThemePreference = 'system' | 'dark' | 'light';
 export type ConnectionState = 'disconnected' | 'connecting' | 'validated' | 'degraded' | 'incompatible';
@@ -15,7 +15,7 @@ export interface AppSnapshot {
   preferences: { locale: Locale; theme: ThemePreference }; connection: ConnectionState;
   target: null | { sessionId: string; endpoint: string; qbittorrentVersion: string; apiVersion: string; libtorrentVersion: string; isLocal: boolean };
   phase: ExperimentPhase; applyStatus: ApplyStatus;
-  activeOperation: null | { id: string; kind: 'networkTest' | 'hardwareDetection' | 'measurement' | 'prepareWorkload' | 'stopWorkload' | 'deleteWorkload' | 'apply' | 'rollback' | 'restore' | 'startTarget' | 'stopTarget' | 'restartTarget'; stage: string; progress: number | null; cancellable: boolean };
+  activeOperation: null | { id: string; kind: 'networkTest' | 'hardwareDetection' | 'measurement' | 'prepareWorkload' | 'stopWorkload' | 'deleteWorkload' | 'apply' | 'rollback' | 'restore' | 'startTarget' | 'stopTarget' | 'restartTarget' | 'startWorkload'; stage: string; progress: number | null; cancellable: boolean };
   metrics: LiveMetric[];
   availableActions: { id: string; enabled: boolean; reasonCode: string | null; messageKey: string }[];
   experiment?: ExperimentSummary | null;
@@ -24,6 +24,7 @@ export interface AppSnapshot {
   networkTest?: NetworkTestResult | null;
   interfaces?: TargetInterface[];
   workloadCatalogue?: { id: string; name: string; totalBytesDecimal: string; metadataSource: string }[];
+  ownedWorkloadCandidates?: WorkloadSummary[] | null;
   restore?: { selectionToken: string; displayName: string; sourceCycleId: string; review: {
     isLegacy: boolean; targetMatches: boolean; canRestore: boolean; alreadyOriginal: boolean; fingerprint: string;
     blockReasonCodes: string[]; differences: { key: string; original: number | boolean | string | null;

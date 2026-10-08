@@ -133,7 +133,7 @@ public sealed class OwnedWorkloadCoordinatorTests
     }
 
     [Fact]
-    public async Task ReconcileIsReadOnlyAndChangeReportsAcceptedWithoutClaimingStateVerified()
+    public async Task ReconcileIsReadOnlyAndStopVerifiesStateWhileDeleteRemainsDenied()
     {
         var (root, store, coordinator) = NewCoordinator();
         var api = new WorkloadApi();
@@ -148,7 +148,7 @@ public sealed class OwnedWorkloadCoordinatorTests
         var deniedDelete = await coordinator.ChangeAsync(session, prepared.JournalId, OwnedWorkloadAction.Delete, false, default);
 
         Assert.Equal(OwnedWorkloadReconciliationStatus.IdentityVerified, reconciliation.Status);
-        Assert.Equal(OwnedWorkloadActionStatus.AcceptedUnverified, changed.Status);
+        Assert.Equal(OwnedWorkloadActionStatus.AcceptedVerified, changed.Status);
         Assert.Equal(OwnedWorkloadActionStatus.Denied, deniedDelete.Status);
         Assert.Equal("WORKLOAD_PATH_UNVERIFIED", deniedDelete.ReasonCode);
         Assert.Equal(before + 1, api.Calls.Count(call => call.Method == "POST"));
@@ -212,6 +212,215 @@ public sealed class OwnedWorkloadCoordinatorTests
         Assert.Single(api.Calls, call => call.Method == "POST");
     }
 
+    [Theory]
+    [InlineData("downloading", true)]
+    [InlineData("uploading", true)]
+    [InlineData("forcedDL", true)]
+    [InlineData("forcedUP", true)]
+    [InlineData("stalledDL", true)]
+    [InlineData("stalledUP", true)]
+    [InlineData("queuedDL", false)]
+    [InlineData("queuedUP", false)]
+    [InlineData("metaDL", false)]
+    [InlineData("forcedMetaDL", false)]
+    [InlineData("stoppedDL", false)]
+    [InlineData("checkingDL", false)]
+    [InlineData("futureState", false)]
+    [InlineData(null, false)]
+    public async Task MeasurementVerificationRequiresFreshActiveStateAndNeverWrites(string? state, bool verified)
+    {
+        var (_, store, coordinator) = NewCoordinator();
+        var api = new WorkloadApi();
+        api.OnAdd = () => api.Torrents = Inventory(Metadata.V1InfoHash, Name, Catalogue.SizeBytes, "/srv/qfrey-test", Category, Tag);
+        using var session = await Connect(api);
+        var prepared = await coordinator.PrepareAsync(session, Catalogue.Id, "/srv/qfrey-test",
+            WorkloadCatalogue.ConsentIdentity(Catalogue), TorrentBytes, default);
+        api.Torrents = Inventory(Metadata.V1InfoHash, Name, Catalogue.SizeBytes, "/srv/qfrey-test", Category, Tag, state);
+        api.Calls.Clear();
+
+        var result = await coordinator.VerifyForMeasurementAsync(session, prepared.JournalId, default);
+
+        Assert.Equal(verified ? OwnedWorkloadReconciliationStatus.IdentityVerified : OwnedWorkloadReconciliationStatus.RecoveryRequired, result.Status);
+        Assert.Equal(verified ? null : "WORKLOAD_ACTIVE_STATE_NOT_OBSERVED", result.ReasonCode);
+        Assert.Equal(prepared.JournalId, result.JournalId);
+        Assert.NotNull(result.Journal);
+        Assert.NotNull(await store.ReadAsync(prepared.JournalId));
+        Assert.DoesNotContain(api.Calls, call => call.Method == "POST");
+        Assert.Equal(2, api.Calls.Count(call => call.Path.EndsWith("torrents/info", StringComparison.Ordinal)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MeasurementVerificationRejectsChangedIdentityOrTarget(bool changeTarget)
+    {
+        var (_, _, coordinator) = NewCoordinator();
+        var api = new WorkloadApi();
+        api.OnAdd = () => api.Torrents = Inventory(Metadata.V1InfoHash, Name, Catalogue.SizeBytes, "/srv/qfrey-test", Category, Tag);
+        using var session = await Connect(api);
+        var prepared = await coordinator.PrepareAsync(session, Catalogue.Id, "/srv/qfrey-test",
+            WorkloadCatalogue.ConsentIdentity(Catalogue), TorrentBytes, default);
+        api.Torrents = Inventory(Metadata.V1InfoHash, Name, Catalogue.SizeBytes, "/srv/qfrey-test", Category,
+            changeTarget ? Tag : "ordinary", "downloading");
+        if (changeTarget) api.Version = "v5.1.0";
+        api.Calls.Clear();
+
+        var result = await coordinator.VerifyForMeasurementAsync(session, prepared.JournalId, default);
+
+        Assert.NotEqual(OwnedWorkloadReconciliationStatus.IdentityVerified, result.Status);
+        Assert.DoesNotContain(api.Calls, call => call.Method == "POST");
+    }
+
+    [Theory]
+    [InlineData("v4.6.7", OwnedWorkloadAction.Stop, "pausedDL", false)]
+    [InlineData("v5.2.0", OwnedWorkloadAction.Stop, "stoppedUP", false)]
+    [InlineData("v4.6.7", OwnedWorkloadAction.Start, "downloading", false)]
+    [InlineData("v5.2.0", OwnedWorkloadAction.Start, "stalledDL", false)]
+    [InlineData("v5.2.0", OwnedWorkloadAction.Start, "downloading", true)]
+    [InlineData("v5.2.0", OwnedWorkloadAction.Stop, "stoppedDL", true)]
+    public async Task ActionReadsBackStateEvenAfterLostResponseWithoutReplayingPost(string version,
+        OwnedWorkloadAction action, string state, bool loseResponse)
+    {
+        var (_, store, coordinator) = NewCoordinator();
+        var api = new WorkloadApi { Version = version, LoseChangeResponse = loseResponse };
+        api.OnAdd = () => api.Torrents = Inventory(Metadata.V1InfoHash, Name, Catalogue.SizeBytes, "/srv/qfrey-test", Category, Tag,
+            version.StartsWith("v4.", StringComparison.Ordinal) ? "pausedDL" : "stoppedDL");
+        using var session = await Connect(api);
+        var prepared = await coordinator.PrepareAsync(session, Catalogue.Id, "/srv/qfrey-test",
+            WorkloadCatalogue.ConsentIdentity(Catalogue), TorrentBytes, default);
+        api.OnChange = () => api.Torrents = Inventory(Metadata.V1InfoHash, Name, Catalogue.SizeBytes, "/srv/qfrey-test", Category, Tag, state);
+        api.Calls.Clear();
+
+        var result = await coordinator.ChangeAsync(session, prepared.JournalId, action, false, default);
+
+        Assert.Equal(OwnedWorkloadActionStatus.AcceptedVerified, result.Status);
+        Assert.Null(result.ReasonCode);
+        Assert.Equal(!loseResponse, session.IsValidated);
+        Assert.Single(api.Calls, call => call.Method == "POST");
+        Assert.Equal(3, api.Calls.Count(call => call.Path.EndsWith("torrents/info", StringComparison.Ordinal)));
+        Assert.NotNull(await store.ReadAsync(prepared.JournalId));
+        if (loseResponse)
+        {
+            var second = await coordinator.ChangeAsync(session, prepared.JournalId, action, false, default);
+            Assert.Equal(OwnedWorkloadActionStatus.RecoveryRequired, second.Status);
+            Assert.Equal(ErrorCodes.TargetNotValidated, second.ReasonCode);
+            Assert.Single(api.Calls, call => call.Method == "POST");
+        }
+    }
+
+    [Theory]
+    [InlineData(OwnedWorkloadAction.Start, "queuedDL", false)]
+    [InlineData(OwnedWorkloadAction.Start, "stoppedDL", true)]
+    [InlineData(OwnedWorkloadAction.Stop, "downloading", false)]
+    [InlineData(OwnedWorkloadAction.Stop, "pausedDL", true)]
+    public async Task UnobservedActionStateRequiresRecoveryAfterBoundedReadbacks(OwnedWorkloadAction action,
+        string state, bool loseResponse)
+    {
+        var (_, store, coordinator) = NewCoordinator();
+        var api = new WorkloadApi { LoseChangeResponse = loseResponse };
+        api.OnAdd = () => api.Torrents = Inventory(Metadata.V1InfoHash, Name, Catalogue.SizeBytes, "/srv/qfrey-test", Category, Tag);
+        using var session = await Connect(api);
+        var prepared = await coordinator.PrepareAsync(session, Catalogue.Id, "/srv/qfrey-test",
+            WorkloadCatalogue.ConsentIdentity(Catalogue), TorrentBytes, default);
+        api.OnChange = () => api.Torrents = Inventory(Metadata.V1InfoHash, Name, Catalogue.SizeBytes, "/srv/qfrey-test", Category, Tag, state);
+        api.Calls.Clear();
+
+        var result = await coordinator.ChangeAsync(session, prepared.JournalId, action, false, default);
+
+        Assert.Equal(OwnedWorkloadActionStatus.RecoveryRequired, result.Status);
+        Assert.Equal(action == OwnedWorkloadAction.Start ? "WORKLOAD_ACTIVE_STATE_NOT_OBSERVED" : "WORKLOAD_STOPPED_STATE_NOT_OBSERVED", result.ReasonCode);
+        Assert.Single(api.Calls, call => call.Method == "POST");
+        Assert.Equal(7, api.Calls.Count(call => call.Path.EndsWith("torrents/info", StringComparison.Ordinal)));
+        Assert.NotNull(await store.ReadAsync(prepared.JournalId));
+    }
+
+    [Fact]
+    public async Task StartCanObserveDelayedStateTransitionWithoutAnotherPost()
+    {
+        var (_, _, coordinator) = NewCoordinator();
+        var api = new WorkloadApi();
+        api.OnAdd = () => api.Torrents = Inventory(Metadata.V1InfoHash, Name, Catalogue.SizeBytes, "/srv/qfrey-test", Category, Tag);
+        using var session = await Connect(api);
+        var prepared = await coordinator.PrepareAsync(session, Catalogue.Id, "/srv/qfrey-test",
+            WorkloadCatalogue.ConsentIdentity(Catalogue), TorrentBytes, default);
+        api.OnInventory = count =>
+        {
+            if (count == 9) api.Torrents = Inventory(Metadata.V1InfoHash, Name, Catalogue.SizeBytes,
+                "/srv/qfrey-test", Category, Tag, "downloading");
+        };
+        api.Calls.Clear();
+
+        var result = await coordinator.ChangeAsync(session, prepared.JournalId, OwnedWorkloadAction.Start, false, default);
+
+        Assert.Equal(OwnedWorkloadActionStatus.AcceptedVerified, result.Status);
+        Assert.Single(api.Calls, call => call.Method == "POST");
+        Assert.Equal(5, api.Calls.Count(call => call.Path.EndsWith("torrents/info", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task LostActionResponseCannotVerifyChangedOwnership()
+    {
+        var (_, store, coordinator) = NewCoordinator();
+        var api = new WorkloadApi { LoseChangeResponse = true };
+        api.OnAdd = () => api.Torrents = Inventory(Metadata.V1InfoHash, Name, Catalogue.SizeBytes, "/srv/qfrey-test", Category, Tag);
+        using var session = await Connect(api);
+        var prepared = await coordinator.PrepareAsync(session, Catalogue.Id, "/srv/qfrey-test",
+            WorkloadCatalogue.ConsentIdentity(Catalogue), TorrentBytes, default);
+        api.OnChange = () => api.Torrents = Inventory(Metadata.V1InfoHash, Name, Catalogue.SizeBytes,
+            "/srv/qfrey-test", Category, "ordinary", "downloading");
+        api.Calls.Clear();
+
+        var result = await coordinator.ChangeAsync(session, prepared.JournalId, OwnedWorkloadAction.Start, false, default);
+
+        Assert.Equal(OwnedWorkloadActionStatus.RecoveryRequired, result.Status);
+        Assert.Equal("WORKLOAD_IDENTITY_NOT_OBSERVED", result.ReasonCode);
+        Assert.Single(api.Calls, call => call.Method == "POST");
+        Assert.NotNull(await store.ReadAsync(prepared.JournalId));
+    }
+
+    [Fact]
+    public async Task LostActionResponseRejectsChangedVersionsBeforeRecoveryInventory()
+    {
+        var (_, _, coordinator) = NewCoordinator();
+        var api = new WorkloadApi { LoseChangeResponse = true };
+        api.OnAdd = () => api.Torrents = Inventory(Metadata.V1InfoHash, Name, Catalogue.SizeBytes, "/srv/qfrey-test", Category, Tag);
+        using var session = await Connect(api);
+        var prepared = await coordinator.PrepareAsync(session, Catalogue.Id, "/srv/qfrey-test",
+            WorkloadCatalogue.ConsentIdentity(Catalogue), TorrentBytes, default);
+        api.OnChange = () => api.Version = "v5.1.0";
+        api.Calls.Clear();
+
+        var result = await coordinator.ChangeAsync(session, prepared.JournalId, OwnedWorkloadAction.Stop, false, default);
+
+        Assert.Equal(OwnedWorkloadActionStatus.RecoveryRequired, result.Status);
+        Assert.Equal(ErrorCodes.SessionStale, result.ReasonCode);
+        Assert.False(session.IsValidated);
+        Assert.Single(api.Calls, call => call.Method == "POST");
+        Assert.Single(api.Calls, call => call.Path.EndsWith("torrents/info", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CancellingMeasurementVerificationDoesNotStopOrDeleteWorkload()
+    {
+        var (_, store, coordinator) = NewCoordinator();
+        var api = new WorkloadApi();
+        api.OnAdd = () => api.Torrents = Inventory(Metadata.V1InfoHash, Name, Catalogue.SizeBytes, "/srv/qfrey-test", Category, Tag);
+        using var session = await Connect(api);
+        var prepared = await coordinator.PrepareAsync(session, Catalogue.Id, "/srv/qfrey-test",
+            WorkloadCatalogue.ConsentIdentity(Catalogue), TorrentBytes, default);
+        api.Torrents = Inventory(Metadata.V1InfoHash, Name, Catalogue.SizeBytes, "/srv/qfrey-test", Category, Tag, "downloading");
+        using var cancellation = new CancellationTokenSource();
+        api.OnInventory = _ => cancellation.Cancel();
+        api.Calls.Clear();
+
+        var result = await coordinator.VerifyForMeasurementAsync(session, prepared.JournalId, cancellation.Token);
+
+        Assert.Equal(OwnedWorkloadReconciliationStatus.RecoveryRequired, result.Status);
+        Assert.Equal(ErrorCodes.Cancelled, result.ReasonCode);
+        Assert.DoesNotContain(api.Calls, call => call.Method == "POST");
+        Assert.NotNull(await store.ReadAsync(prepared.JournalId));
+    }
+
     private static async Task<QbittorrentSession> Connect(WorkloadApi api) => await QbittorrentSession.ConnectAsync(
         new(Endpoint, new BypassAuthentication()), default, api);
 
@@ -256,10 +465,12 @@ public sealed class OwnedWorkloadCoordinatorTests
     {
         public string Torrents { get; set; } = "[]";
         public bool LoseAddResponse { get; set; }
+        public bool LoseChangeResponse { get; set; }
         public bool BlockFirstInventory { get; set; }
         public bool DurableAtAdd { get; private set; }
         public string? DurableJournalRoot { get; set; }
         public Action? OnAdd { get; set; }
+        public Action? OnChange { get; set; }
         public Action<int>? OnInventory { get; set; }
         public string Version { get; set; } = "v5.2.0";
         public TaskCompletionSource InventoryStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -289,6 +500,13 @@ public sealed class OwnedWorkloadCoordinatorTests
                     && Directory.GetFiles(DurableJournalRoot, "*.json").Length > 0;
                 if (LoseAddResponse) throw new HttpRequestException("simulated lost add response");
                 OnAdd?.Invoke();
+            }
+            if (request.Method == HttpMethod.Post && (path.EndsWith("torrents/stop", StringComparison.Ordinal)
+                || path.EndsWith("torrents/pause", StringComparison.Ordinal) || path.EndsWith("torrents/start", StringComparison.Ordinal)
+                || path.EndsWith("torrents/resume", StringComparison.Ordinal)))
+            {
+                OnChange?.Invoke();
+                if (LoseChangeResponse) throw new HttpRequestException("simulated lost change response");
             }
             var response = path.Split('/').Last() switch
             {

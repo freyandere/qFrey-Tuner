@@ -24,6 +24,7 @@ public sealed record StartMeasurementPayload(MeasurementKind Kind, WorkloadRefer
 public sealed record CancelOperationPayload(Guid OperationId);
 public sealed record PrepareWorkloadPayload(string CatalogueId, string ServerSavePath, string ApprovalToken);
 public sealed record StopWorkloadPayload(Guid WorkloadId, string ConfirmationToken);
+public sealed record SelectOwnedWorkloadPayload(Guid WorkloadId);
 public sealed record DeleteWorkloadPayload(Guid WorkloadId, bool DeleteFiles, string ConfirmationToken);
 public sealed record ApplyPlanPayload(Guid PlanId, long ExpectedRevision, string ConfirmationToken);
 public sealed record RollbackPayload(Guid CycleId, long ExpectedRevision, string ConfirmationToken);
@@ -55,7 +56,8 @@ public static class CommandPayloads
             "StartMeasurement" => Decode<StartMeasurementPayload>(envelope),
             "CancelOperation" => Decode<CancelOperationPayload>(envelope),
             "PrepareWorkload" => Decode<PrepareWorkloadPayload>(envelope),
-            "StopOwnedWorkload" => Decode<StopWorkloadPayload>(envelope),
+            "StartOwnedWorkload" or "StopOwnedWorkload" => Decode<StopWorkloadPayload>(envelope),
+            "SelectOwnedWorkload" => Decode<SelectOwnedWorkloadPayload>(envelope),
             "DeleteOwnedWorkload" => Decode<DeleteWorkloadPayload>(envelope),
             "ApplyPlan" => Decode<ApplyPlanPayload>(envelope),
             "Rollback" => Decode<RollbackPayload>(envelope),
@@ -140,6 +142,8 @@ public static class CommandPayloads
                 throw new JsonException("INVALID_PAYLOAD");
             case StopWorkloadPayload p when p.WorkloadId == Guid.Empty || string.IsNullOrWhiteSpace(p.ConfirmationToken):
                 throw new JsonException("INVALID_PAYLOAD");
+            case SelectOwnedWorkloadPayload p when p.WorkloadId == Guid.Empty:
+                throw new JsonException("INVALID_PAYLOAD");
             case DeleteWorkloadPayload p when p.WorkloadId == Guid.Empty || string.IsNullOrWhiteSpace(p.ConfirmationToken):
                 throw new JsonException("INVALID_PAYLOAD");
             case RestoreBackupPayload p when string.IsNullOrWhiteSpace(p.SelectionToken) || string.IsNullOrWhiteSpace(p.ConfirmationToken):
@@ -151,7 +155,7 @@ public static class CommandPayloads
                     || p.Workload.Hashes.Distinct(StringComparer.OrdinalIgnoreCase).Count() != p.Workload.Hashes.Length
                     || p.Workload.Hashes.Any(h => h is null || h.Length != 40 || !h.All(Uri.IsHexDigit))) throw new JsonException("INVALID_WORKLOAD");
                 break;
-            case RequestConfirmationPayload p when p.ActionId is not ("ApplyPlan" or "Rollback" or "RestoreLegacyBackup" or "RunNetworkTest" or "PrepareWorkload" or "StopOwnedWorkload" or "DeleteOwnedWorkload" or "StartTarget" or "StopTarget" or "RestartTarget"):
+            case RequestConfirmationPayload p when p.ActionId is not ("ApplyPlan" or "Rollback" or "RestoreLegacyBackup" or "RunNetworkTest" or "PrepareWorkload" or "StartOwnedWorkload" or "StopOwnedWorkload" or "DeleteOwnedWorkload" or "StartTarget" or "StopTarget" or "RestartTarget"):
                 throw new JsonException("INVALID_PAYLOAD");
             case SelectFilePayload p when p.Purpose is not ("restore" or "exportJson" or "exportHtml" or "volume"):
                 throw new JsonException("INVALID_PAYLOAD");

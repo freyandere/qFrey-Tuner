@@ -54,7 +54,9 @@ export function isRequest(value: unknown): value is Request {
     }
     case 'CancelOperation': return exact(p, ['operationId']) && uuid(p.operationId);
     case 'PrepareWorkload': return exact(p, ['catalogueId', 'serverSavePath', 'approvalToken']) && token(p.catalogueId) && token(p.serverSavePath) && token(p.approvalToken);
+    case 'StartOwnedWorkload':
     case 'StopOwnedWorkload': return exact(p, ['workloadId', 'confirmationToken']) && uuid(p.workloadId) && token(p.confirmationToken);
+    case 'SelectOwnedWorkload': return exact(p, ['workloadId']) && uuid(p.workloadId);
     case 'DeleteOwnedWorkload': return exact(p, ['workloadId', 'deleteFiles', 'confirmationToken']) && uuid(p.workloadId) && typeof p.deleteFiles === 'boolean' && token(p.confirmationToken);
     case 'ApplyPlan': return exact(p, ['planId', 'expectedRevision', 'confirmationToken']) && uuid(p.planId) && revision(p.expectedRevision) && token(p.confirmationToken);
     case 'Rollback': return exact(p, ['cycleId', 'expectedRevision', 'confirmationToken']) && uuid(p.cycleId) && revision(p.expectedRevision) && token(p.confirmationToken);
@@ -65,7 +67,7 @@ export function isRequest(value: unknown): value is Request {
     case 'ExportReport': return exact(p, ['cycleId', 'format', 'destinationToken', 'locale']) && uuid(p.cycleId) && oneOf(p.format, ['json', 'html']) && token(p.destinationToken) && oneOf(p.locale, ['ru-RU', 'en-US']);
     case 'RequestConfirmation': return ['actionId', 'planId', 'cycleId', 'workloadId'].every(k => Object.hasOwn(p, k))
       && Object.keys(p).every(k => ['actionId', 'planId', 'cycleId', 'workloadId', 'catalogueId', 'serverSavePath', 'selectionToken'].includes(k))
-      && oneOf(p.actionId, ['ApplyPlan', 'Rollback', 'RestoreLegacyBackup', 'RunNetworkTest', 'PrepareWorkload', 'StopOwnedWorkload', 'DeleteOwnedWorkload', 'StartTarget', 'StopTarget', 'RestartTarget'])
+      && oneOf(p.actionId, ['ApplyPlan', 'Rollback', 'RestoreLegacyBackup', 'RunNetworkTest', 'PrepareWorkload', 'StartOwnedWorkload', 'StopOwnedWorkload', 'DeleteOwnedWorkload', 'StartTarget', 'StopTarget', 'RestartTarget'])
       && [p.planId, p.cycleId, p.workloadId].every(id => id === null || uuid(id))
       && (p.actionId === 'PrepareWorkload'
         ? token(p.catalogueId) && (p.catalogueId as string).length <= 64 && token(p.serverSavePath)

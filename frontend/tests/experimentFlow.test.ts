@@ -88,6 +88,28 @@ describe('ExperimentFlow', () => {
     expect(html).toContain('readOnly=""');
   });
 
+  it('measures an authoritative owned reference without manually entered hashes or implicit download start', () => {
+    const reference = { id: 'owned-id', kind: 'owned' as const, hashes: [hashA] };
+    const owned = snapshot({ experiment: { ...snapshot().experiment!, workload: {
+      reference, name: 'Official test image', totalBytesDecimal: '1234', serverSavePath: '/test',
+      catalogueId: 'test', ownershipVerified: true, reasonCodes: [],
+    } } });
+    const html = render(owned);
+    expect(html).toContain('Official test image');
+    expect(html).toContain('Measurement does not start, stop or delete');
+    expect(html).not.toContain('<textarea');
+    expect(html).not.toContain('disabled=""');
+    expect(measurementWorkloadReference(false, reference, [hashB], () => 'unused', reference)).toEqual(reference);
+    expect(measurementWorkloadReference(true, reference, [hashB], () => 'unused', reference)).toEqual(reference);
+    expect(measurementWorkloadReference(true, { ...reference, id: 'other' }, [], () => 'unused', reference)).toBeNull();
+    expect(measurementWorkloadReference(true, reference, [], () => 'unused', { ...reference, hashes: [hashB] })).toBeNull();
+    expect(render({ ...owned, experiment: { ...owned.experiment!, workload: {
+      ...owned.experiment!.workload!, ownershipVerified: false,
+    } } })).toContain('disabled=""');
+    expect(render({ ...owned, phase: 'recoveryRequired' })).toContain('disabled=""');
+    expect(render({ ...owned, applyStatus: 'unverified' })).toContain('disabled=""');
+  });
+
   it('treats a rolled-back cycle as historical and directs the user to a new plan and cycle', () => {
     const rolledBack = snapshot({
       preferences: { locale: 'ru-RU', theme: 'light' }, phase: 'rolledBack', applyStatus: 'reverted',

@@ -41,6 +41,22 @@ public static class TorrentTelemetry
     private static readonly HashSet<string> ActiveStates = new(StringComparer.Ordinal)
     { "downloading", "uploading", "forcedDL", "forcedUP", "stalledDL", "stalledUP" };
 
+    public static bool IsIdleInventory(JsonElement torrentsInfo)
+    {
+        if (torrentsInfo.ValueKind != JsonValueKind.Array || torrentsInfo.GetArrayLength() > MaximumTorrents) return false;
+        var hashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var torrent in torrentsInfo.EnumerateArray())
+        {
+            if (torrent.ValueKind != JsonValueKind.Object
+                || !torrent.TryGetProperty("hash", out var hashValue) || hashValue.ValueKind != JsonValueKind.String
+                || !TryHash(hashValue.GetString(), out var hash) || !hashes.Add(hash)
+                || !torrent.TryGetProperty("state", out var stateValue) || stateValue.ValueKind != JsonValueKind.String
+                || stateValue.GetString() is not { } state || !KnownStates.Contains(state)
+                || ActiveStates.Contains(state) || state is "metaDL" or "forcedMetaDL") return false;
+        }
+        return true;
+    }
+
     public static TorrentTelemetryEvidence Aggregate(JsonElement torrentsInfo,
         IReadOnlyCollection<string> selectedHashes, DateTimeOffset sampledAtUtc)
     {

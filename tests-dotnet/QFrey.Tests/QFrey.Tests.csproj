@@ -10,6 +10,8 @@
     <Compile Include="../../src/QFrey.Desktop/Bridge/MutationCommands.cs" Link="MutationCommands.cs" />
     <Compile Include="../../src/QFrey.Desktop/Bridge/AfterMeasurementCommands.cs" Link="AfterMeasurementCommands.cs" />
     <Compile Include="../../src/QFrey.Desktop/Bridge/HardwareCommands.cs" Link="HardwareCommands.cs" />
+    <Compile Include="../../src/QFrey.Desktop/Bridge/LifecycleCommands.cs" Link="LifecycleCommands.cs" />
+    <Compile Include="../../src/QFrey.Desktop/Bridge/NetworkCommands.cs" Link="NetworkCommands.cs" />
     <Compile Include="../../src/QFrey.Desktop/Bridge/OwnedWorkloadCommands.cs" Link="OwnedWorkloadCommands.cs" />
     <Compile Include="../../src/QFrey.Desktop/Bridge/OwnedWorkloadRecovery.cs" Link="OwnedWorkloadRecovery.cs" />
     <Compile Include="../../src/QFrey.Desktop/Bridge/RestoreCommands.cs" Link="RestoreCommands.cs" />

@@ -7,19 +7,30 @@ const screens = {
   'ru-RU': ['Обзор', 'Условия', 'Рекомендации', 'Эксперимент', 'Результаты', 'История'],
 } as const;
 
-async function useMockBridge(page: Page) {
-  await page.addInitScript((fixture) => {
+async function useMockBridge(page: Page, deferHistory = false) {
+  await page.addInitScript(({ fixture, deferHistory }) => {
     type TestRequest = { command: string; requestId: string; payload?: { locale?: string; theme?: string } };
     type MessageHandler = (event: MessageEvent<unknown>) => void;
     const handlers: MessageHandler[] = [];
     let revision = fixture.revision;
     let data = structuredClone(fixture.data);
+    const historyReplies: ((endpoint: string) => void)[] = [];
+    Object.assign(window, { releaseHistory: (index: number, endpoint: string) => historyReplies[index]!(endpoint) });
 
     Object.defineProperty(window, 'chrome', {
       configurable: true,
       value: { webview: {
         addEventListener: (_type: 'message', handler: MessageHandler) => handlers.push(handler),
         postMessage: (message: TestRequest) => {
+          if (message.command === 'ListHistory' && deferHistory) {
+            historyReplies.push(endpoint => handlers.forEach(handler => handler({ data: {
+              ...fixture, requestId: message.requestId, data: { items: [{
+                cycleId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', createdUtc: '2026-01-01T00:30:00Z',
+                endpoint, qbittorrentVersion: '5.1.0', phase: 'completed', applyStatus: 'verified', changeCount: 1,
+              }], nextCursor: null }, error: null,
+            } } as MessageEvent<unknown>)));
+            return;
+          }
           if (message.command === 'SetUiPreferences' && message.payload) {
             data.preferences = { ...data.preferences, ...message.payload };
             data.revision = ++revision;
@@ -41,7 +52,7 @@ async function useMockBridge(page: Page) {
     const addMarker = () => document.body.append(marker);
     if (document.body) addMarker();
     else document.addEventListener('DOMContentLoaded', addMarker, { once: true });
-  }, initialize);
+  }, { fixture: initialize, deferHistory });
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
@@ -101,4 +112,35 @@ test('system theme follows OS preference and navigation is keyboard accessible',
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Setup');
   await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
+});
+
+test('setup preserves incomplete numeric edits across navigation and empty screens offer next steps', async ({ page }) => {
+  await useMockBridge(page);
+  await page.goto('/');
+  const navigation = page.getByRole('navigation', { name: 'qFrey-Tuner' });
+  await navigation.getByRole('button', { name: 'Setup', exact: true }).click();
+  await page.locator('#setup-download').fill('-');
+  await navigation.getByRole('button', { name: 'Recommendations', exact: true }).click();
+  await expect(page.locator('#setup-download')).toBeHidden();
+  await page.getByRole('button', { name: 'Go to setup and build a plan', exact: true }).click();
+  await expect(page.locator('#setup-download')).toHaveValue('-');
+  await navigation.getByRole('button', { name: 'Results', exact: true }).click();
+  await page.getByRole('button', { name: 'Go to the experiment', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Experiment');
+});
+
+test('history ignores an older page after leaving and reopening the tab', async ({ page }) => {
+  await useMockBridge(page, true);
+  await page.goto('/');
+  const navigation = page.getByRole('navigation', { name: 'qFrey-Tuner' });
+  await navigation.getByRole('button', { name: 'History', exact: true }).click();
+  await expect(page.getByText('Loading saved cycles…', { exact: true })).toBeVisible();
+  await navigation.getByRole('button', { name: 'Overview', exact: true }).click();
+  await navigation.getByRole('button', { name: 'History', exact: true }).click();
+  await expect(page.getByText('Loading saved cycles…', { exact: true })).toBeVisible();
+  await page.evaluate(() => (window as Window & { releaseHistory: (index: number, endpoint: string) => void }).releaseHistory(1, 'http://latest.invalid'));
+  await expect(page.getByRole('cell', { name: 'http://latest.invalid', exact: true })).toBeVisible();
+  await page.evaluate(() => (window as Window & { releaseHistory: (index: number, endpoint: string) => void }).releaseHistory(0, 'http://old.invalid'));
+  await expect(page.getByRole('cell', { name: 'http://latest.invalid', exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'http://old.invalid', exact: true })).toHaveCount(0);
 });

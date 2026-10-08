@@ -2,6 +2,8 @@ using System.Text.Json;
 using QFrey.Core.Contracts;
 using QFrey.Core.Qbittorrent;
 using QFrey.Core.Tuning;
+using QFrey.Core.Platform;
+using QFrey.Desktop.Platform;
 
 namespace QFrey.Desktop.Bridge;
 
@@ -54,7 +56,22 @@ public sealed partial class BridgeDispatcher
             && target is not null && plan?.TargetSessionId == target.SessionId;
         var applicable = idle && !recoveryBlocked && pendingOwnedWorkloadId is null && plan is { Applicable: true, PreviewOnly: false };
         var status = currentCycle?.ApplyStatus;
+        var operationalIdle = activeOperation is null && !shuttingDown && session?.IsValidated == true && target is not null;
+        var canOperate = operationalIdle && !recoveryBlocked && pendingOwnedWorkloadId is null
+            && status is not (ApplyStatus.Pending or ApplyStatus.Unverified or ApplyStatus.Verified);
+        ProcessOwnerObservation? owner = null;
+        if (canOperate && target!.IsLocal)
+        {
+            try { owner = ObserveLifecycleOwner(target.Endpoint, true); }
+            catch (Exception) { /* Unknown owner cannot authorize lifecycle actions. */ }
+        }
+        var ownsWorkload = experiment?.Workload is { OwnershipVerified: true, Reference.Kind: WorkloadKind.Owned };
         return [.. availableActions,
+            new("RunNetworkTest", canOperate, null, "network.run"),
+            new("StopTarget", canOperate && owner?.Status == OwnerLookupStatus.Available, null, "lifecycle.stop"),
+            new("RestartTarget", canOperate && owner is { Status: OwnerLookupStatus.Available, RestartBlocked: false }, null, "lifecycle.restart"),
+            new("StartOwnedWorkload", canOperate && ownsWorkload, null, "workload.start"),
+            new("StopOwnedWorkload", canOperate && ownsWorkload, null, "workload.stop"),
             new("AcceptPlan", applicable && plan is { Approved: false } && status is null or ApplyStatus.NotApplied, null, "mutation.approve"),
             new("ApplyPlan", applicable && plan is { Approved: true } && status == ApplyStatus.NotApplied
                 && currentCycle?.BaselineContext is not null && experiment?.Baseline?.Status == MeasurementStatus.Valid, null, "mutation.apply"),
@@ -89,7 +106,8 @@ public sealed partial class BridgeDispatcher
         var ownedSession = session;
         mutationReview = review;
         mutation = new(ownedSession, target.SessionId, review, cycles,
-            (cycle, token) => ExperimentCommands.ValidateBaselineAsync(cycle, ownedSession, token),
+            (cycle, token) => ExperimentCommands.ValidateBaselineAsync(cycle, ownedSession, token,
+                async (reference, cancellation) => { await ResolveOwnedMeasurementAsync(reference, cancellation).ConfigureAwait(false); }),
             PauseDashboardAsync, () => Task.CompletedTask, timeProvider, MarkCommitStartingAsync);
         return mutation;
     }
@@ -97,6 +115,8 @@ public sealed partial class BridgeDispatcher
     private void RevokeConfirmations()
     {
         RevokeLegacyRestoreConfirmations();
+        RevokeLifecycleConfirmations();
+        RevokeNetworkConfirmations();
         confirmations = [];
         ownedWorkloadConfirmations.Clear();
         mutation?.Dispose(); mutation = null; mutationReview = null;

@@ -56,9 +56,10 @@ pair check additionally blocks a partial `listen_port`/`random_port` proposal.
 Desktop connection/read-only telemetry and PlanBuilder preview are now dispatched.
 TransferController `dl_info_speed`/`up_info_speed` are validated integer B/s session
 values; `dht_nodes` is a session count. Missing/invalid fields are not zero.
-No C# write transport/coordinator is implemented yet; passing these tests does
-not enable tuning or prove real-client parity. Preview lacks measured baseline.
-The upstream checker still exercises Python payloads. See
+The C# transport/coordinator now supports guarded apply, readback and rollback,
+with a measured baseline required before applying a plan. Mock checks do not
+prove real-client parity. The upstream checker accepts exported actual C# mapper
+payloads as well as its default Python payloads. See
 [migration progress](migration-v2/progress.md) for actual tests and remaining gates.
 
 With the existing development dependencies installed:
@@ -67,6 +68,21 @@ With the existing development dependencies installed:
 uv run --locked --extra dev python -m pytest tests/ -q
 uv run --locked --extra dev python scripts/check_qbittorrent_schema.py
 ```
+
+To check the actual C# mapper against the same pinned upstream tags, export its
+verified golden payloads and pass that file to the existing checker:
+
+```powershell
+. ./scripts/dev-env.ps1
+$env:QFREY_SCHEMA_EXPORT_PATH = Join-Path $PWD '.cache/tests/csharp-schema/payloads.json'
+dotnet test tests-dotnet/QFrey.Tests/QFrey.Tests.csproj --no-restore --filter FullyQualifiedName~PreferenceMappingTests.CanonicalPayloadMatchesLegacyFixture
+uv run --locked --extra dev python scripts/check_qbittorrent_schema.py --payloads $env:QFREY_SCHEMA_EXPORT_PATH
+Remove-Item Env:QFREY_SCHEMA_EXPORT_PATH
+```
+
+The exporter writes only within the repository's `.cache`. Mapper regressions
+also cover speed conversion from KiB/s to B/s, buffer units, enum values and
+libtorrent-2 exclusions; the source checker alone verifies keys and JSON types.
 
 The pytest suite is independent of external documentation/network services;
 the HTTP integration fixture starts a temporary local server, not qBittorrent.

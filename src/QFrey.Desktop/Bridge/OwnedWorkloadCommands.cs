@@ -37,7 +37,7 @@ public sealed partial class BridgeDispatcher
         if (recoveryBlocked || pendingOwnedWorkloadId is not null
             || currentCycle?.ApplyStatus is ApplyStatus.Pending or ApplyStatus.Unverified or ApplyStatus.Verified)
             return Failure(command.RequestId, ErrorCodes.RecoveryRequired, "errors.recoveryRequired");
-        if (payload.ActionId is not ("PrepareWorkload" or "StopOwnedWorkload" or "DeleteOwnedWorkload"))
+        if (payload.ActionId is not ("PrepareWorkload" or "StartOwnedWorkload" or "StopOwnedWorkload" or "DeleteOwnedWorkload"))
             return Failure(command.RequestId, ErrorCodes.InvalidCommand, "errors.invalidCommand");
         if (payload.ActionId != "PrepareWorkload" && (payload.PlanId is not null || payload.CycleId is not null))
             return Failure(command.RequestId, ErrorCodes.InvalidCommand, "errors.invalidCommand");
@@ -93,7 +93,7 @@ public sealed partial class BridgeDispatcher
             catalogueId = journal.CatalogueId;
             consentIdentity = journal.CatalogueConsentIdentity;
             serverSavePath = journal.ServerSavePath;
-            messageKey = "confirmation.workload.stop";
+            messageKey = payload.ActionId == "StartOwnedWorkload" ? "confirmation.workload.start" : "confirmation.workload.stop";
             parameters = new(StringComparer.Ordinal)
             {
                 ["name"] = new TextParameter(journal.Name),
@@ -155,7 +155,7 @@ public sealed partial class BridgeDispatcher
     }
 
     private Task<string> StartOwnedWorkloadActionAsync(CommandEnvelope command, StopWorkloadPayload payload,
-        string canonical, CancellationToken token) => StartOwnedWorkloadActionAsync(command, "StopOwnedWorkload", payload.WorkloadId,
+        string canonical, CancellationToken token) => StartOwnedWorkloadActionAsync(command, command.Command, payload.WorkloadId,
             payload.ConfirmationToken, false, canonical, token);
 
     private Task<string> StartOwnedWorkloadActionAsync(CommandEnvelope command, DeleteWorkloadPayload payload,
@@ -170,7 +170,7 @@ public sealed partial class BridgeDispatcher
         if (recoveryBlocked || pendingOwnedWorkloadId is not null
             || currentCycle?.ApplyStatus is ApplyStatus.Pending or ApplyStatus.Unverified or ApplyStatus.Verified)
             return Failure(command.RequestId, ErrorCodes.RecoveryRequired, "errors.recoveryRequired");
-        if (action == "DeleteOwnedWorkload" || deleteFiles)
+        if (action is not ("StartOwnedWorkload" or "StopOwnedWorkload") || deleteFiles)
             return Failure(command.RequestId, ErrorCodes.WorkloadNotOwned, "errors.workloadNotOwned");
         await operationSession!.RevalidateVersionsAsync(token).ConfigureAwait(false);
         if (CurrentOwnedTarget(operationSession) != CurrentOwnedTarget(target!))
@@ -184,13 +184,14 @@ public sealed partial class BridgeDispatcher
         var cancellation = new CancellationTokenSource();
         var operationId = Guid.NewGuid();
         var sessionId = target!.SessionId;
-        activeOperation = new(operationId, OperationKind.StopWorkload, "ownershipCheck", null, true);
+        var workloadAction = action == "StartOwnedWorkload" ? OwnedWorkloadAction.Start : OwnedWorkloadAction.Stop;
+        activeOperation = new(operationId, workloadAction == OwnedWorkloadAction.Start ? OperationKind.StartWorkload : OperationKind.StopWorkload, "ownershipCheck", null, true);
         measurementCancellation = cancellation;
         RevokeConfirmations();
         ownedWorkloadConfirmations.Clear();
         revision++;
         measurementTask = Task.Run(() => RunOwnedWorkloadActionAsync(operationId, sessionId, session!,
-            workloadId, cancellation));
+            workloadId, workloadAction, cancellation));
         var accepted = JsonSerializer.Serialize(new CommandReply<AcceptedOperation>(command.RequestId, true,
             revision, new(operationId, revision), null), Protocol.Json);
         Cache(command.RequestId, canonical, accepted);
@@ -320,7 +321,7 @@ public sealed partial class BridgeDispatcher
     }
 
     private async Task RunOwnedWorkloadActionAsync(Guid operationId, Guid sessionId, QbittorrentSession operationSession,
-        Guid workloadId, CancellationTokenSource cancellation)
+        Guid workloadId, OwnedWorkloadAction action, CancellationTokenSource cancellation)
     {
         OwnedWorkloadActionResult? result = null;
         var failureCode = ErrorCodes.UnexpectedFailure;
@@ -328,7 +329,7 @@ public sealed partial class BridgeDispatcher
         {
             await PauseDashboardAsync(cancellation.Token).ConfigureAwait(false);
             result = await workloadCoordinator.ChangeAsync(operationSession, workloadId,
-                OwnedWorkloadAction.Stop, false, cancellation.Token).ConfigureAwait(false);
+                action, false, cancellation.Token).ConfigureAwait(false);
         }
         catch (QbittorrentException error) { failureCode = error.Code; }
         catch (OperationCanceledException) { failureCode = "MEASUREMENT_CANCELLED"; }
@@ -344,11 +345,16 @@ public sealed partial class BridgeDispatcher
                 {
                     if (activeOperation?.Id == operationId && target?.SessionId == sessionId)
                     {
-                        if (result?.Status is OwnedWorkloadActionStatus.RecoveryRequired or OwnedWorkloadActionStatus.AcceptedUnverified)
+                        if (result?.Status == OwnedWorkloadActionStatus.AcceptedVerified)
+                        {
+                            pendingOwnedWorkloadId = null;
+                            availableActions = [];
+                        }
+                        else if (result is null || result.Status is OwnedWorkloadActionStatus.RecoveryRequired or OwnedWorkloadActionStatus.AcceptedUnverified)
                         {
                             pendingOwnedWorkloadId = workloadId;
                             availableActions = [new("operation.error", false,
-                                result.ReasonCode ?? "WORKLOAD_ACTION_UNVERIFIED", "errors.recoveryRequired")];
+                                result?.ReasonCode ?? failureCode, "errors.recoveryRequired")];
                         }
                         else availableActions = [new("operation.error", false,
                             result?.ReasonCode ?? failureCode, result is null ? "errors.workloadPreparationFailed" : "errors.workloadNotOwned")];

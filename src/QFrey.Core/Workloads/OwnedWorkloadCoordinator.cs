@@ -9,7 +9,7 @@ public sealed record OwnedWorkloadPrepareResult(OwnedWorkloadPrepareStatus Statu
 public enum OwnedWorkloadReconciliationStatus { IdentityVerified, NotObserved, RecoveryRequired }
 public sealed record OwnedWorkloadReconciliation(OwnedWorkloadReconciliationStatus Status, Guid JournalId,
     OwnedWorkloadJournal? Journal, string? ReasonCode);
-public enum OwnedWorkloadActionStatus { AcceptedUnverified, Denied, RecoveryRequired }
+public enum OwnedWorkloadActionStatus { AcceptedUnverified, Denied, RecoveryRequired, AcceptedVerified }
 public sealed record OwnedWorkloadActionResult(OwnedWorkloadActionStatus Status, Guid JournalId, string? ReasonCode);
 
 /// <summary>Coordinates consent, durable identity, one add request, and read-only recovery.</summary>
@@ -94,8 +94,15 @@ public sealed class OwnedWorkloadCoordinator
         finally { operationGate.Release(); }
     }
 
-    public async Task<OwnedWorkloadReconciliation> ReconcileAsync(QbittorrentSession session, Guid trustedJournalId,
-        CancellationToken token)
+    public Task<OwnedWorkloadReconciliation> ReconcileAsync(QbittorrentSession session, Guid trustedJournalId,
+        CancellationToken token) => VerifyAsync(session, trustedJournalId, false, token);
+
+    /// <summary>Fresh read-only ownership and active-state check. Cancellation never stops or deletes the torrent.</summary>
+    public Task<OwnedWorkloadReconciliation> VerifyForMeasurementAsync(QbittorrentSession session, Guid trustedJournalId,
+        CancellationToken token) => VerifyAsync(session, trustedJournalId, true, token);
+
+    private async Task<OwnedWorkloadReconciliation> VerifyAsync(QbittorrentSession session, Guid trustedJournalId,
+        bool requireActive, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(session);
         if (trustedJournalId == Guid.Empty) throw new ArgumentException("Journal id is required.", nameof(trustedJournalId));
@@ -110,8 +117,9 @@ public sealed class OwnedWorkloadCoordinator
             {
                 var inventory = await session.ReadRecoveryOwnedWorkloadInventoryAsync(operationToken).ConfigureAwait(false);
                 var identity = journal.Authorize(OwnedWorkloadAction.Stop, inventory.Target, inventory);
-                if (identity.Allowed && !await ReadStoppedStateAsync(session, journal, operationToken).ConfigureAwait(false))
-                    return new(OwnedWorkloadReconciliationStatus.RecoveryRequired, trustedJournalId, journal, "WORKLOAD_STOPPED_STATE_NOT_OBSERVED");
+                if (identity.Allowed && !await ReadStateAsync(session, journal, requireActive, operationToken).ConfigureAwait(false))
+                    return new(OwnedWorkloadReconciliationStatus.RecoveryRequired, trustedJournalId, journal,
+                        requireActive ? "WORKLOAD_ACTIVE_STATE_NOT_OBSERVED" : "WORKLOAD_STOPPED_STATE_NOT_OBSERVED");
                 return identity.Allowed
                     ? new(OwnedWorkloadReconciliationStatus.IdentityVerified, trustedJournalId, journal, null)
                     : new(OwnedWorkloadReconciliationStatus.NotObserved, trustedJournalId, journal, identity.ReasonCode);
@@ -143,8 +151,23 @@ public sealed class OwnedWorkloadCoordinator
                 return new(OwnedWorkloadActionStatus.Denied, trustedJournalId, "WORKLOAD_PATH_UNVERIFIED");
             try
             {
-                await session.ChangeOwnedWorkloadAsync(journal, action, deleteFiles, null, operationToken).ConfigureAwait(false);
-                return new(OwnedWorkloadActionStatus.AcceptedUnverified, trustedJournalId, null);
+                // The write is attempted once. A lost response is reconciled only through reads.
+                try
+                {
+                    await session.ChangeOwnedWorkloadAsync(journal, action, deleteFiles, null, operationToken).ConfigureAwait(false);
+                }
+                catch (QbittorrentException error) when (error.Code is ErrorCodes.ApiUnavailable or ErrorCodes.ApiTimeout) { }
+                for (var attempt = 0; attempt < 3; attempt++)
+                {
+                    var inventory = await session.ReadRecoveryOwnedWorkloadInventoryAsync(operationToken).ConfigureAwait(false);
+                    if (!journal.Authorize(action, inventory.Target, inventory).Allowed)
+                        return new(OwnedWorkloadActionStatus.RecoveryRequired, trustedJournalId, "WORKLOAD_IDENTITY_NOT_OBSERVED");
+                    if (await ReadStateAsync(session, journal, action == OwnedWorkloadAction.Start, operationToken).ConfigureAwait(false))
+                        return new(OwnedWorkloadActionStatus.AcceptedVerified, trustedJournalId, null);
+                    if (attempt < 2) await Task.Delay(TimeSpan.FromMilliseconds(250), operationToken).ConfigureAwait(false);
+                }
+                return new(OwnedWorkloadActionStatus.RecoveryRequired, trustedJournalId,
+                    action == OwnedWorkloadAction.Start ? "WORKLOAD_ACTIVE_STATE_NOT_OBSERVED" : "WORKLOAD_STOPPED_STATE_NOT_OBSERVED");
             }
             catch (Exception error) when (error is QbittorrentException or OperationCanceledException)
             {
@@ -155,13 +178,18 @@ public sealed class OwnedWorkloadCoordinator
         finally { operationGate.Release(); }
     }
 
-    private static async Task<bool> ReadStoppedStateAsync(QbittorrentSession session, OwnedWorkloadJournal journal,
-        CancellationToken token)
+    private static Task<bool> ReadStoppedStateAsync(QbittorrentSession session, OwnedWorkloadJournal journal,
+        CancellationToken token) => ReadStateAsync(session, journal, false, token);
+
+    private static async Task<bool> ReadStateAsync(QbittorrentSession session, OwnedWorkloadJournal journal,
+        bool requireActive, CancellationToken token)
     {
-        var telemetry = await session.ReadTorrentMetricsAsync([journal.Hash], token).ConfigureAwait(false);
+        var telemetry = await session.ReadRecoveryOwnedWorkloadMetricsAsync([journal.Hash], token).ConfigureAwait(false);
         if (telemetry.Context.SelectedTorrents is not { Count: 1 } selected
             || !string.Equals(selected[0].Hash, journal.Hash, StringComparison.OrdinalIgnoreCase)
             || selected[0].StateReasonCode is not null) return false;
+        if (requireActive)
+            return selected[0].State is "downloading" or "uploading" or "forcedDL" or "forcedUP" or "stalledDL" or "stalledUP";
         return journal.Target.QbittorrentVersion.StartsWith("v4.", StringComparison.OrdinalIgnoreCase)
             ? selected[0].State is "pausedDL" or "pausedUP"
             : selected[0].State is "stoppedDL" or "stoppedUP";

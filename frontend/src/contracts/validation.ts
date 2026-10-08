@@ -46,7 +46,7 @@ function hardwareInputs(h: unknown): boolean {
     && integer(h.performanceCores) && h.performanceCores >= 0 && h.performanceCores <= h.cpuCores && oneOf(h.source, inputSources);
 }
 export function networkTest(v: unknown): boolean {
-  return record(v) && finite(v.downloadBytesPerSecond) && v.downloadBytesPerSecond >= 0 && finite(v.uploadBytesPerSecond) && v.uploadBytesPerSecond >= 0
+  return record(v) && nullable(v.downloadBytesPerSecond, s => finite(s) && s >= 0) && nullable(v.uploadBytesPerSecond, s => finite(s) && s >= 0)
     && timestamp(v.measuredUtc) && strings(v.reasonCodes);
 }
 
@@ -103,7 +103,12 @@ export function resultCard(v: unknown): v is ResultCard {
   }
 }
 function workloadReference(v: unknown): boolean {
-  return record(v) && uuid(v.id) && oneOf(v.kind, ['existing', 'owned']) && list(v.hashes, h => typeof h === 'string' && /^[a-f0-9]{40}$/i.test(h), 5000) && Array.isArray(v.hashes) && v.hashes.length > 0;
+  return record(v) && uuid(v.id) && oneOf(v.kind, ['existing', 'owned']) && list(v.hashes, h => typeof h === 'string' && /^[a-f0-9]{40}$/i.test(h), 5000) && Array.isArray(v.hashes) && v.hashes.length > 0
+    && new Set(v.hashes.map(h => (h as string).toLowerCase())).size === v.hashes.length;
+}
+export function workloadSummary(w: unknown): boolean {
+  return record(w) && workloadReference(w.reference) && text(w.name) && typeof w.totalBytesDecimal === 'string' && /^\d+$/.test(w.totalBytesDecimal)
+    && text(w.serverSavePath) && nullable(w.catalogueId, text) && typeof w.ownershipVerified === 'boolean' && strings(w.reasonCodes);
 }
 export function measurement(v: unknown): v is MeasurementSummary {
   return record(v) && uuid(v.id) && oneOf(v.kind, ['baseline', 'after']) && oneOf(v.status, measurementStatuses) && timestamp(v.startedUtc)
@@ -115,8 +120,7 @@ export function acceptedOperation(v: unknown): v is AcceptedOperation {
 }
 export function experiment(v: unknown): v is ExperimentSummary {
   return record(v) && nullable(v.cycleId, uuid) && nullable(v.runInputs, inputs)
-    && nullable(v.workload, w => record(w) && workloadReference(w.reference) && text(w.name) && typeof w.totalBytesDecimal === 'string' && /^\d+$/.test(w.totalBytesDecimal)
-      && text(w.serverSavePath) && nullable(w.catalogueId, text) && typeof w.ownershipVerified === 'boolean' && strings(w.reasonCodes))
+    && nullable(v.workload, workloadSummary)
     && nullable(v.baseline, measurement) && nullable(v.after, measurement) && nullable(v.plan, plan) && list(v.results, resultCard, 128);
 }
 export function confirmation(v: unknown): boolean {
