@@ -7,6 +7,7 @@ Read the section that matches the task; follow its linked documents before makin
 - Use `uv sync --locked --extra dev` and `uv run --locked --extra dev ...` for reproducible Python checks. Update `uv.lock` locally when dependencies change.
 - For manual runs, set `UV_CACHE_DIR=.cache/uv`, `UV_PROJECT_ENVIRONMENT=.cache/venv` and `PYTHONPYCACHEPREFIX=.cache/pycache`; `build.bat` sets these itself. Pytest's temporary and cache paths are configured in `pyproject.toml`.
 - Run `uv run --locked --extra dev python -m pytest tests/ -q` and `uv run --locked --extra dev python scripts/check_qbittorrent_schema.py`. GUI tests require Windows/Tk; the schema check requires network access. These checks must not mutate a user's real qBittorrent.
+- Keep pytest basetemp within its own child of `.cache/tests` (default `.cache/tests/pytest`); never set it to the shared parent containing WebView profiles. Parallel runs need distinct children.
 - Report the checks actually run and any blocked checks.
 
 ## qBittorrent contracts

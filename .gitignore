@@ -67,3 +67,4 @@ outputs/
 .ux-tests-*/
 .ux_*.py
 .build-deps/
+node_modules/

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><IsTestProject>true</IsTestProject><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <ProjectReference Include="../../src/QFrey.Core/QFrey.Core.csproj" />
+    <Compile Include="../../src/QFrey.Desktop/Bridge/BridgeDispatcher.cs" Link="BridgeDispatcher.cs" />
+    <Compile Include="../../src/QFrey.Desktop/Bridge/ExperimentCommands.cs" Link="ExperimentCommands.cs" />
+    <Compile Include="../../src/QFrey.Desktop/Bridge/MutationCommands.cs" Link="MutationCommands.cs" />
+    <Compile Include="../../src/QFrey.Desktop/Bridge/AfterMeasurementCommands.cs" Link="AfterMeasurementCommands.cs" />
+    <Compile Include="../../src/QFrey.Desktop/Bridge/HardwareCommands.cs" Link="HardwareCommands.cs" />
+    <Compile Include="../../src/QFrey.Desktop/Bridge/LifecycleCommands.cs" Link="LifecycleCommands.cs" />
+    <Compile Include="../../src/QFrey.Desktop/Bridge/NetworkCommands.cs" Link="NetworkCommands.cs" />
+    <Compile Include="../../src/QFrey.Desktop/Bridge/OwnedWorkloadCommands.cs" Link="OwnedWorkloadCommands.cs" />
+    <Compile Include="../../src/QFrey.Desktop/Bridge/OwnedWorkloadRecovery.cs" Link="OwnedWorkloadRecovery.cs" />
+    <Compile Include="../../src/QFrey.Desktop/Bridge/RestoreCommands.cs" Link="RestoreCommands.cs" />
+    <Compile Include="../../src/QFrey.Desktop/Platform/WindowsPlatformProbe.cs" Link="WindowsPlatformProbe.cs" />
+    <Compile Include="../../src/QFrey.Desktop/Platform/ProcessLaunchContext.cs" Link="ProcessLaunchContext.cs" />
+    <Compile Include="../../src/QFrey.Desktop/Platform/TargetLifecycle.cs" Link="TargetLifecycle.cs" />
+    <Compile Include="../../src/QFrey.Desktop/Platform/WindowsProcessMetrics.cs" Link="WindowsProcessMetrics.cs" />
+    <ProjectReference Include="../QFrey.NativeHelper/QFrey.NativeHelper.csproj" ReferenceOutputAssembly="false" />
+    <None Include="../../tests-contract/fixtures/protocol/initialize-success.json" Link="fixtures/initialize-success.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

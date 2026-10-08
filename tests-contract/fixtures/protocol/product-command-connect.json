@@ -1,0 +1,1 @@
+{"protocolVersion":1,"requestId":"00000000-0000-0000-0000-000000000103","command":"Connect","targetSessionId":null,"expectedRevision":null,"payload":{"endpoint":"https://qb.example.test","auth":{"kind":"password","username":"demo","password":"never-store-this-password"}}}

@@ -1,0 +1,77 @@
+{
+  "api": "2.11.0",
+  "applied": null,
+  "baseline": {
+    "download_stddev": 104857.5,
+    "interval_seconds": 1,
+    "mean_download_mib_s": 1.1,
+    "mean_upload_mib_s": 0.25,
+    "preferences": {
+      "listen_port": 6881,
+      "max_connec": 500,
+      "random_port": false,
+      "up_limit": 0
+    },
+    "samples": [
+      {
+        "dht_nodes": 12,
+        "download": 1048576,
+        "elapsed": 0.0,
+        "upload": 262144
+      },
+      {
+        "dht_nodes": 12,
+        "download": 1258291,
+        "elapsed": 1.0,
+        "upload": 262144
+      }
+    ],
+    "torrent_context": [
+      {
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "num_leechs": 3,
+        "num_seeds": 8,
+        "progress": 0.3,
+        "state": "downloading"
+      }
+    ],
+    "upload_stddev": 0.0,
+    "warmup_seconds": 10,
+    "workload": [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ]
+  },
+  "created_or_updated_utc": "2026-10-05T00:00:00+00:00",
+  "failure": "",
+  "host": "http://127.0.0.1:8080",
+  "libtorrent": "2.0.11",
+  "optimized": null,
+  "original": {
+    "max_connec": 500
+  },
+  "plan": {
+    "after": {
+      "max_connec": 1000
+    },
+    "before": {
+      "max_connec": 500
+    },
+    "explanations": {},
+    "inputs": {
+      "speed": 500
+    },
+    "omitted": [],
+    "warnings": []
+  },
+  "qBittorrent": "v5.1.0",
+  "test_workload": {
+    "bytes": 4762707968,
+    "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "host": "http://127.0.0.1:8080",
+    "save_path": "<fixture-download-path>",
+    "source": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-desktop-amd64.iso.torrent",
+    "tag": "qfrey-test-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "workload_id": "ubuntu"
+  },
+  "verified": false
+}

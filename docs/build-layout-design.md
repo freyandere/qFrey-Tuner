@@ -37,6 +37,14 @@ Run.bat запускает только artifacts/release/qFrey-Tuner.exe либ
 
 Ошибка компиляции или проверки запуска сохраняет текущий release. Заблокированный запущенным приложением EXE не удаляется: публикация завершается ошибкой, пользователь закрывает окно и повторяет сборку. Архивы не очищаются автоматически.
 
+### Ранняя проверка миграции .NET (не выпуск)
+
+`python scripts/build.py --backend dotnet --candidate-only` собирает WPF/WebView2 и встроенный React bundle в `.cache/staging/qFrey-Tuner.exe`, выполняет `--check` и `--smoke-test`, затем пишет `.cache/staging/build.json` с SHA-256 и `candidate_only=true`. Единственная точка упаковки сохраняется; прямой `dotnet publish` не является пользовательским маршрутом сборки. Без `--candidate-only` backend dotnet пока отклоняется: G5 не пройден, текущий Python release заменять нельзя.
+
+Среда готовится через `scripts/dev-env.ps1`: SDK закреплён `global.json`, NuGet/pnpm/obj/bin/frontend outputs находятся в `.cache`. Frontend устанавливается по frozen lock, NuGet — в locked mode. WebView2 Evergreen остаётся prerequisite, .NET runtime включён в EXE. Web assets встроены и извлекаются в проверяемый hash-scoped cache под LocalAppData; smoke использует изолированный профиль `.cache/tests/webview/<run-id>`. Наличие XML/PDB промежуточных файлов staging не делает их release assets. После G5 по-прежнему публикуются только EXE и manifest.
+
+Core build также генерирует `.cache/generated/locales.json` из полных frontend RU/EN словарей через `scripts/export-i18n.mjs` и встраивает его в assembly для native dialogs/отчётов. Поэтому даже отдельной сборке Core нужны проектные Node и установленные locked frontend dependencies; во время запуска EXE Node не требуется. Incremental inputs включают i18n и component message dictionaries, чтобы изменения переводов не оставляли устаревший embedded каталог.
+
 ## Уборка существующих файлов
 
 Сначала скопировать каждый старый EXE в artifacts/archive/legacy/<исходный путь> и проверить SHA-256. После проверки можно перенести его исходное размещение; исполняемые версии не удалять. Запущенные или заблокированные файлы оставить до закрытия приложения.

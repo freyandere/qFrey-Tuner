@@ -1,0 +1,1 @@
+{"protocolVersion":1,"requestId":"00000000-0000-0000-0000-000000000803","command":"StartMeasurement","targetSessionId":"00000000-0000-0000-0000-000000000201","expectedRevision":4,"payload":{"kind":"baseline","workload":null}}

@@ -1,0 +1,1 @@
+{"protocolVersion":1,"requestId":"00000000-0000-0000-0000-000000000102","command":"CancelOperation","targetSessionId":"00000000-0000-0000-0000-000000000201","expectedRevision":7,"payload":{"operationId":"00000000-0000-0000-0000-000000000301"}}

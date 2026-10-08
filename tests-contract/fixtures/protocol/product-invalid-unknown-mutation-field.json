@@ -1,0 +1,1 @@
+{"protocolVersion":1,"requestId":"00000000-0000-0000-0000-000000000805","command":"ApplyPlan","targetSessionId":"00000000-0000-0000-0000-000000000201","expectedRevision":4,"payload":{"planId":"00000000-0000-0000-0000-000000000401","expectedRevision":4,"confirmationToken":"fixture-token","force":true}}

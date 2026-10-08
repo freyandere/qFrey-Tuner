@@ -41,3 +41,38 @@ def test_publish_preserves_previous_executable_and_manifest(tmp_path, monkeypatc
     manifest = json.loads((release / 'build.json').read_text())
     assert manifest['version'] == '0.3.4'
     assert manifest['sha256'] == hashlib.sha256(b'new exe').hexdigest()
+
+
+def test_dotnet_candidate_cannot_publish_before_signoff(tmp_path, monkeypatch):
+    import pytest
+    from scripts import build
+    calls = []
+    candidate = tmp_path / 'qFrey-Tuner.exe'
+    candidate.write_bytes(b'candidate')
+    monkeypatch.setattr(build, 'build_candidate', lambda backend, version: calls.append(backend) or candidate)
+    monkeypatch.setattr(build, 'publish', lambda *args: pytest.fail('candidate must not publish'))
+    build.main(['--backend', 'dotnet', '--candidate-only'])
+    assert calls == ['dotnet']
+    with pytest.raises(SystemExit) as error:
+        build.main(['--backend', 'dotnet'])
+    assert error.value.code == 2
+    assert calls == ['dotnet']
+
+
+def test_failed_candidate_does_not_retain_previous_manifest(tmp_path, monkeypatch):
+    import subprocess
+    import pytest
+    from scripts import build
+    staging = tmp_path / 'staging'
+    staging.mkdir()
+    manifest = staging / 'build.json'
+    manifest.write_text('{"sha256": "previous"}')
+    monkeypatch.setattr(build, 'CACHE', tmp_path)
+
+    def fail(*args, **kwargs):
+        raise subprocess.CalledProcessError(3, args[0])
+
+    monkeypatch.setattr(build.subprocess, 'run', fail)
+    with pytest.raises(subprocess.CalledProcessError):
+        build.build_candidate('python', '0.3.4')
+    assert not manifest.exists()

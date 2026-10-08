@@ -1,0 +1,20 @@
+{
+  "name": "qfrey-tuner-ui",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "vite build",
+    "test:unit": "vitest run",
+    "test:e2e:web": "playwright test",
+    "dev": "vite --host 127.0.0.1"
+  },
+  "dependencies": { "react": "19.1.0", "react-dom": "19.1.0" },
+  "devDependencies": {
+    "@types/react": "19.1.0", "@types/react-dom": "19.1.0",
+    "typescript": "5.8.3", "vite": "6.3.5", "vitest": "3.2.4",
+    "tailwindcss": "4.1.8", "@tailwindcss/vite": "4.1.8",
+    "@playwright/test": "1.52.0", "@types/node": "22.15.29"
+  }
+}

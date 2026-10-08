@@ -1,0 +1,1 @@
+{"protocolVersion":1,"requestId":"00000000-0000-0000-0000-000000000001","command":"RequestConfirmation","targetSessionId":"00000000-0000-0000-0000-000000000002","expectedRevision":4,"payload":{"actionId":"PrepareWorkload","planId":null,"cycleId":null,"workloadId":null,"catalogueId":"ubuntu","serverSavePath":"/srv/qfrey-test"}}

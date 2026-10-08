@@ -1,0 +1,20 @@
+{
+  "requestId": "00000000-0000-0000-0000-000000000001",
+  "ok": true,
+  "revision": 0,
+  "data": {
+    "protocolVersion": 1,
+    "schemaVersion": 2,
+    "appVersion": "0.3.4",
+    "revision": 0,
+    "preferences": { "locale": "en-US", "theme": "system" },
+    "connection": "disconnected",
+    "target": null,
+    "phase": "draft",
+    "applyStatus": "notApplied",
+    "activeOperation": null,
+    "metrics": [],
+    "availableActions": []
+  },
+  "error": null
+}
